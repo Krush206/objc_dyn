@@ -6,8 +6,10 @@
 #import <objc/objc.h>
 
 void loadClass(void);
-Class getClass(const char *, const char *);
+Class getClass(const char *);
 Class getRootClass(Class);
+void inheritCopy(Class, Class);
+void setRootClass(const char *);
 
 struct Class {
   Class cls, super, root;
