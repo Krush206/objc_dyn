@@ -1,33 +1,73 @@
 #import "objc_dyn.h"
 
+static void allocRootClass(struct Root *);
+static struct Root *forEachRootClass(struct Root *);
+static struct Root *loadRootClass(struct Root *, struct Class *);
+static Class getRootClass(Class);
+
 static struct Class clsdef;
 static struct Root rootdef;
 static char *clsroot;
 
-static void loadRootClass(struct Class *clsnew)
+static void allocRootClass(struct Root *rootnew)
 {
-  struct Root *rootnew;
   struct Root *roothead;
 
-  if(clsnew != &clsdef)
-    loadRootClass(clsnew->next);
-  rootnew = rootdef.next;
-  while(rootnew != &rootdef)
+  roothead = &rootdef;
+  while((rootnew = rootnew->next) != &rootdef)
   {
-    if(rootnew->cls == clsnew->root)
-      return;
-    rootnew = rootnew->next;
+    struct Root *alloc;
+
+    alloc = malloc(sizeof *alloc);
+    alloc->next = &rootdef;
+    alloc->prev = roothead;
+    alloc->cls = rootnew->cls;
+    alloc->name = rootnew->name;
+    rootdef.prev = alloc;
+    roothead->next = alloc;
+    roothead = alloc;
   }
-  roothead = rootnew;
-  rootnew = malloc(sizeof *rootnew);
-  rootnew->next = &rootdef;
-  rootnew->prev = roothead;
-  roothead->next = rootnew;
-  rootnew->cls = clsnew->root;
-  rootnew->name = class_getName(clsnew->root);
 }
 
-void loadClass(void)
+static struct Root *forEachRootClass(struct Root *rootnew)
+{
+  struct Root *roothead;
+
+  if(rootnew == &rootdef)
+    return rootnew;
+  for(roothead = rootnew->next; roothead != rootnew; roothead = roothead->next)
+    if(roothead->cls == rootnew->cls)
+    {
+      rootnew->prev->next = rootnew->next;
+      rootnew->next->prev = rootnew->prev;
+
+      return forEachRootClass(rootnew->next);
+    }
+
+  return forEachRootClass(rootnew->next);
+}
+
+static struct Root *loadRootClass(struct Root *rootnew, struct Class *clsnew)
+{
+  struct Root roothead;
+
+  if(clsnew == &clsdef)
+  {
+    allocRootClass(forEachRootClass(rootdef.next));
+
+    return rootnew;
+  }
+  roothead.next = &rootdef;
+  roothead.prev = rootnew;
+  roothead.cls = clsnew->root;
+  roothead.name = class_getName(clsnew->root);
+  rootdef.prev = &roothead;
+  rootnew->next = &roothead;
+
+  return loadRootClass(&roothead, clsnew->next);
+}
+
+void loadClass(const char *rootname)
 {
   unsigned int i;
   Class *cls;
@@ -60,12 +100,12 @@ void loadClass(void)
   rootnew = &rootdef;
   rootnew->next = rootnew;
   rootnew->prev = rootnew;
-  loadRootClass(clsdef.next);
-  setRootClass("NSObject");
+  (void) loadRootClass(&rootdef, clsdef.next);
+  setRootClass(rootname);
   loaded = 1;
 }
 
-Class getRootClass(Class cls)
+static Class getRootClass(Class cls)
 {
   Class clsnew;
 
@@ -79,16 +119,14 @@ Class getRootClass(Class cls)
   return clsnew;
 }
 
-Class getClass(const char *name)
+Class getClass(const char *clsname)
 {
-  struct Class *oclsdef;
+  struct Class *clsnew;
 
-  oclsdef = clsdef;
-  do
-    if(strcmp(name, clsdef->name) == 0 &&
-       strcmp(clsroot, class_getName(clsdef->root)) == 0)
-      return clsdef->cls;
-  while((clsdef = clsdef->next) != oclsdef);
+  for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
+    if(strcmp(clsname, clsnew->name) == 0 &&
+       strcmp(clsroot, class_getName(clsnew->root)) == 0)
+      return clsnew->cls;
 
   return Nil;
 }
