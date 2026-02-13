@@ -5,22 +5,26 @@
 #import <string.h>
 #import <objc/objc.h>
 
-void loadClass(const char *);
-struct Class *getClass(const char *);
-void inheritCopy(Class, Class);
-void setRootClass(const char *);
-
 struct Class {
-  Class cls, super, root;
+  Class cls;
+  Class super;
+  Class root;
+  Class meta;
   const char *name;
-  struct Class *next,
-	       *prev;
+  struct Class *next;
+  struct Class *prev;
 };
 
 struct Root {
   Class cls;
+  Class meta;
   const char *name;
-  struct Root *next,
-	      *prev;
+  struct Root *next;
+  struct Root *prev;
 };
+
+extern void loadClass(const char *);
+extern void setClass(struct Class *);
+extern Class getClass(const char *);
+extern void setRootClass(const char *);
 #endif /* !OBJC_DYN */

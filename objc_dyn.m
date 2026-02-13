@@ -22,6 +22,7 @@ static void allocRootClass(struct Root *rootnew)
     alloc->next = &rootdef;
     alloc->prev = roothead;
     alloc->cls = rootnew->cls;
+    alloc->meta = rootnew->meta;
     alloc->name = rootnew->name;
     rootdef.prev = alloc;
     roothead->next = alloc;
@@ -61,6 +62,7 @@ static void loadRootClass(struct Root *rootnew, struct Class *clsnew)
   roothead.next = &rootdef;
   roothead.prev = rootnew;
   roothead.cls = clsnew->root;
+  roothead.meta = object_getClass(clsnew->root);
   roothead.name = class_getName(clsnew->root);
   rootdef.prev = &roothead;
   rootnew->next = &roothead;
@@ -90,6 +92,7 @@ void loadClass(const char *rootname)
     clsnew->cls = cls[i];
     clsnew->name = class_getName(clsnew->cls);
     clsnew->super = class_getSuperclass(clsnew->cls);
+    clsnew->meta = object_getClass(clsnew->cls);
     clsnew->root = getRootClass(clsnew->cls);
     clsnew->next = &clsdef;
     clsnew->prev = clshead;
@@ -120,16 +123,16 @@ static Class getRootClass(Class cls)
   return clsnew;
 }
 
-struct Class *getClass(const char *clsname)
+Class getClass(const char *clsname)
 {
   struct Class *clsnew;
 
   for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
     if(strcmp(clsname, clsnew->name) == 0 &&
        strcmp(clsroot, class_getName(clsnew->root)) == 0)
-      return clsnew;
+      return clsnew->cls;
 
-  return NULL;
+  return Nil;
 }
 
 void setRootClass(const char *new)
@@ -138,64 +141,16 @@ void setRootClass(const char *new)
   clsroot = strcpy(malloc(strlen(new) + 1), new);
 }
 
-void inheritCopy(Class from, Class to)
-{
-  unsigned int i;
-  Method *meth;
-
-  meth = class_copyMethodList(from, &i);
-  while(i--)
-    (void) class_addMethod(to, method_getName(meth[i]),
-			   method_getImplementation(meth[i]),
-			   method_getTypeEncoding(meth[i]));
-  free(meth);
-  meth = class_copyMethodList(object_getClass(from), &i);
-  while(i--)
-    (void) class_addMethod(to, method_getName(meth[i]),
-			   method_getImplementation(meth[i]),
-			   method_getTypeEncoding(meth[i]));
-  free(meth);
-}
-
 void setClass(struct Class *clsnew)
 {
-  objc_registerClassPair(clsnew->cls = objc_allocateClassPair(clsnew->super,
-                                                              clsnew->name,
-                                                              0));
-}
-
-static void forEachClass(struct Class *clsnew)
-{
-  struct Root *clshead;
-
-  if(clsnew == &clsdef)
+  clsnew->cls = objc_allocateClassPair(clsnew->super, clsnew->name, 0);
+  if(clsnew->cls == Nil)
     return;
-  for(clshead = clsnew->next; clshead != clsnew; clshead = clshead->next)
-    if(clshead->super == clsnew->super)
-    {
-      clsnew->prev->next = clsnew->next;
-      clsnew->next->prev = clsnew->prev;
-
-      break;
-    }
-
-  forEachClass(clsnew->next);
-}
-
-void newRoot(struct Class *newroot, struct Class *oldroot, const char *name)
-{
-  struct Class *clshead;
-  struct Class alloc;
-
-  newroot->super = Nil;
-  newroot->name = name;
-  setClass(newroot);
-
-  clshead = &clsdef;
-  while((clshead = clshead->next) != &clsdef)
-    if(clshead->cls == oldroot->cls)
-      break;
-  alloc.super = newroot->cls;
-  alloc.name = olroot->name;
-  setClass(&alloc);
+  objc_registerClassPair(clsnew->cls);
+  clsnew->meta = object_getClass(clsnew->cls);
+  clsnew->root = getRootClass(clsnew->cls);
+  clsnew->next = &clsdef;
+  clsnew->prev = clsdef.prev;
+  clsdef.prev->next = clsnew;
+  clsdef.prev = clsnew;
 }
