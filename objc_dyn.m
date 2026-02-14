@@ -5,9 +5,11 @@ static void forEachRootClass(struct Root *);
 static void loadRootClass(struct Root *, struct Class *);
 static Class getRootClass(Class);
 
+static struct Argument argdef;
 static struct Object objdef;
 static struct Class clsdef;
 static struct Root rootdef;
+
 static char *clsroot;
 
 static void allocRootClass(struct Root *rootnew)
@@ -147,6 +149,17 @@ id getObject(const char *objname)
   return nil;
 }
 
+struct Object *getObjectRecord(const char *objname)
+{
+  struct Object *objnew;
+
+  for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+    if(equal(objname, objnew->name))
+      return objnew;
+
+  return NULL;
+}
+
 void setRootClass(const char *new)
 {
   free(clsroot);
@@ -170,4 +183,17 @@ void setClass(struct Class *clsnew)
 struct Object *getObjectList(void)
 {
   return &objdef;
+}
+
+struct Argument *getArgumentList(void)
+{
+  return &argdef;
+}
+
+void freeArgument(struct Argument *argnew)
+{
+  if(argnew == &argdef)
+    return;
+  freeArgument(argnew->next);
+  free(argnew);
 }

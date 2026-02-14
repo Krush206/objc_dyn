@@ -1,13 +1,4 @@
 /*
- * osh.c - original source code for the V6 Thompson shell as found in V7 UNIX
- *
- *	From: Version 7 (V7) UNIX /usr/src/cmd/osh.c
- *
- *	NOTE: The first 42 lines of this file have been added by
- *	      Jeffrey Allen Neitzel <jan (at) etsh (dot) nl> to comply
- *	      with the license.  The file is otherwise unmodified.
- */
-/*-
  * Copyright (C) Caldera International Inc.  2001-2002.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,17 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- */
-
 #import "objc_dyn.h"
 
 #define LINSIZ 1000
 #define ARGSIZ 50
 
 static void main1(void);
-static int word(void);
-static void execute(char **, char **);
+static void word(void);
+static id execute(char **, char **);
 static void assign(char **, char **, char **);
 
 char *promp;
@@ -67,17 +55,20 @@ static char *args[ARGSIZ];
 
 static struct Object *objdef;
 
+static struct Argument *argdef;
+
 int main(void)
 {
 	loadClass("NSObject");
 	objdef = getObjectList();
+	argdef = getArgumentList();
 	promp = "% ";
 	if(getuid() == 0)
 		promp = "# ";
 	if(!isatty(0))
 		promp = 0;
 loop:
-	if(promp != 0)
+	if(promp != NULL)
 		prs(promp);
 	peekc = getc();
 	main1();
@@ -86,56 +77,77 @@ loop:
 
 static void assign(char **ap1, char **ap2, char **ap3)
 {
-	if(ap2 == ap3)
+	register struct Object *obj;
+	register struct Object *alloc;
+
+	if(ap2++ == ap3)
 	{
 		err("invalid assignment", 255);
 		return;
 	}
-	if(getClass(*ap1) != 0)
+	if(getClass(*ap1) != Nil)
 	{
-		err("cannot assign to a class", 255);
+		err("cannot reassign a class class", 255);
 		return;
 	}
-	if(getObject(*ap1) != 0)
+	if((obj = getObjectRecord(*ap1)) != NULL)
 	{
-		printf("OK\n");
-		return;
+		obj->prev->next = obj->next;
+		obj->next->prev = obj->prev;
+		free(obj->name);
+		free(obj);
 	}
-	if(ap2 + 1 == ap3)
+	if(ap2 == ap3)
 	{
-		struct Object *alloc;
-
-		printf("ap2\n");
 		alloc = malloc(sizeof *alloc);
 		alloc->next = objdef;
 		alloc->prev = objdef->prev;
-		alloc->obj = 0;
+		alloc->obj = nil;
 		alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
 		objdef->prev->next = alloc;
 		objdef->prev = alloc;
-		printf("%s\n", alloc->name);
 		return;
 	}
+	alloc->obj = execute(ap2, ap3);
 }
 
-static void execute(char **avs, char **ave)
+static id execute(char **avs, char **ave)
 {
 	register char **cp1, **cp2;
 
+	while(avs != ave)
+		printf("%s\n", *avs++);
 	if(avs == ave)
-		return;
+		return nil;
 	cp1 = &avs[0];
 	cp2 = &avs[1];
 	if(equal(*cp1, "@"))
 	{
 		assign(cp1 + 1, cp2, ave);
-		return;
+		return nil;
+	}
+	{
+		struct Argument *argnew;
+		char *alloc;
+		char **av;
+
+		for(av = avs; av != ave; av++)
+			if(lastchr(*av) == ':')
+			{
+				alloc = malloc(strlen(*av) + 1);
+				argnew = malloc(sizeof *argnew);
+				argnew->next = argdef;
+				argnew->prev = argdef->prev;
+				argnew->arg = *(av + 1);
+				argdef->prev->next = argnew;
+				argdef->prev = argnew;
+			}
 	}
 }
 
 static void main1(void)
 {
-	register char  *cp;
+	register char *cp;
 
 	argp = args;
 	eargp = args+ARGSIZ-1;
@@ -143,6 +155,7 @@ static void main1(void)
 	elinep = line+LINSIZ-1;
 	error = 0;
 	gflg = 0;
+	freeArgument(argdef->next);
 	do {
 		cp = linep;
 		word();
@@ -151,11 +164,18 @@ static void main1(void)
 		if(error != 0)
 			err("syntax error", 255);
 		else
-			execute(args, argp - 1);
+		{
+			const char *name;
+			id obj;
+
+			obj = execute(args, argp - 1);
+			name = class_getName([obj class]);
+			(void) printf("%s <%p>\n", name, obj);
+		}
 	}
 }
 
-static int word(void)
+static void word(void)
 {
 	register char c, c1;
 
@@ -175,7 +195,7 @@ loop:
 			if(c == '\n') {
 				error++;
 				peekc = c;
-				return 1;
+				return;
 			}
 			*linep++ = c|QUOTE;
 		}
@@ -192,7 +212,8 @@ loop:
 	case '\n':
 		*linep++ = c;
 		*linep++ = '\0';
-		return 1;
+	case ':':
+		return;
 	}
 
 	peekc = c;
@@ -200,14 +221,15 @@ loop:
 pack:
 	for(;;) {
 		c = getc();
-		if(any(c, " '\"\t;&<>()|^\n")) {
+		if(any(c, " :'\"\t;&<>()|^\n")) {
 			peekc = c;
 			if(any(c, "\"'"))
 				goto loop;
+			if(c == ':')
+				*linep++ = getc();
 			*linep++ = '\0';
-			return 1;
+			return;
 		}
 		*linep++ = c;
 	}
-	return 0;
 }
