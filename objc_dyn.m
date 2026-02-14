@@ -129,8 +129,8 @@ Class getClass(const char *clsname)
   struct Class *clsnew;
 
   for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
-    if(strcmp(clsname, clsnew->name) == 0 &&
-       strcmp(clsroot, class_getName(clsnew->root)) == 0)
+    if(equal(clsname, clsnew->name) &&
+       equal(clsroot, class_getName(clsnew->root)))
       return clsnew->cls;
 
   return Nil;
@@ -141,7 +141,7 @@ id getObject(const char *objname)
   struct Object *objnew;
 
   for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
-    if(strcmp(objname, objnew->name) == 0)
+    if(equal(objname, objnew->name))
       return objnew->obj;
 
   return nil;
