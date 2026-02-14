@@ -5,6 +5,7 @@ static void forEachRootClass(struct Root *);
 static void loadRootClass(struct Root *, struct Class *);
 static Class getRootClass(Class);
 
+static struct Object objdef;
 static struct Class clsdef;
 static struct Root rootdef;
 static char *clsroot;
@@ -76,7 +77,6 @@ void loadClass(const char *rootname)
   Class *cls;
   struct Class *clsnew;
   struct Class *clshead;
-  struct Root *rootnew;
   static int loaded;
 
   if(loaded)
@@ -101,9 +101,10 @@ void loadClass(const char *rootname)
     clshead = clsnew;
   }
   free(cls);
-  rootnew = &rootdef;
-  rootnew->next = rootnew;
-  rootnew->prev = rootnew;
+  objdef.next = &objdef;
+  objdef.prev = &objdef;
+  rootdef.next = &rootdef;
+  rootdef.prev = &rootdef;
   loadRootClass(&rootdef, clsdef.next);
   setRootClass(rootname);
   loaded = 1;
@@ -135,6 +136,17 @@ Class getClass(const char *clsname)
   return Nil;
 }
 
+id getObject(const char *objname)
+{
+  struct Object *objnew;
+
+  for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+    if(strcmp(objname, objnew->name) == 0)
+      return objnew->obj;
+
+  return nil;
+}
+
 void setRootClass(const char *new)
 {
   free(clsroot);
@@ -153,4 +165,9 @@ void setClass(struct Class *clsnew)
   clsnew->prev = clsdef.prev;
   clsdef.prev->next = clsnew;
   clsdef.prev = clsnew;
+}
+
+struct Object *getObjectList(void)
+{
+  return &objdef;
 }

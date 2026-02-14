@@ -23,8 +23,17 @@ struct Root {
   struct Root *prev;
 };
 
+struct Object {
+  id obj;
+  const char *name;
+  struct Object *next;
+  struct Object *prev;
+};
+
 extern void loadClass(const char *);
 extern void setClass(struct Class *);
 extern Class getClass(const char *);
 extern void setRootClass(const char *);
+extern id getObject(const char *);
+extern struct Object *getObjectList(void);
 #endif /* !OBJC_DYN */
