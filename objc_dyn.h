@@ -5,8 +5,6 @@
 #import <unistd.h>
 #import <objc/objc.h>
 
-#define QUOTE 0200
-
 struct Class {
   Class cls;
   Class super;

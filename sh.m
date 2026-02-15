@@ -39,7 +39,8 @@
 static void main1(void);
 static void word(void);
 static id execute(char **, char **);
-static void assign(char **, char **, char **);
+static id assign(char **, char **, char **);
+static void syntax(char **, char **);
 
 char *promp;
 char *linep;
@@ -75,7 +76,7 @@ loop:
 	goto loop;
 }
 
-static void assign(char **ap1, char **ap2, char **ap3)
+static id assign(char **ap1, char **ap2, char **ap3)
 {
 	register struct Object *obj;
 	register struct Object *alloc;
@@ -83,12 +84,12 @@ static void assign(char **ap1, char **ap2, char **ap3)
 	if(ap2++ == ap3)
 	{
 		err("invalid assignment", 255);
-		return;
+		return nil;
 	}
 	if(getClass(*ap1) != Nil)
 	{
 		err("cannot reassign a class class", 255);
-		return;
+		return nil;
 	}
 	if((obj = getObjectRecord(*ap1)) != NULL)
 	{
@@ -97,51 +98,54 @@ static void assign(char **ap1, char **ap2, char **ap3)
 		free(obj->name);
 		free(obj);
 	}
+	alloc = malloc(sizeof *alloc);
+	alloc->next = objdef;
+	alloc->prev = objdef->prev;
+	alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
+	objdef->prev->next = alloc;
+	objdef->prev = alloc;
 	if(ap2 == ap3)
-	{
-		alloc = malloc(sizeof *alloc);
-		alloc->next = objdef;
-		alloc->prev = objdef->prev;
-		alloc->obj = nil;
-		alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
-		objdef->prev->next = alloc;
-		objdef->prev = alloc;
-		return;
-	}
-	alloc->obj = execute(ap2, ap3);
+		return alloc->obj = nil;
+	return alloc->obj = execute(ap2, ap3);
 }
 
 static id execute(char **avs, char **ave)
 {
-	register char **cp1, **cp2;
+	register char **cp1;
+	register char **cp2;
+	register id ret;
 
-	while(avs != ave)
-		printf("%s\n", *avs++);
 	if(avs == ave)
 		return nil;
 	cp1 = &avs[0];
 	cp2 = &avs[1];
 	if(equal(*cp1, "@"))
-	{
-		assign(cp1 + 1, cp2, ave);
-		return nil;
-	}
-	{
-		struct Argument *argnew;
-		char *alloc;
-		char **av;
+		return assign(cp1 + 1, cp2, ave);
+	syntax(cp1, ave);
+	ret = [getClass(*cp1) performSelector: sel_registerName(*cp2)];
+	if(ret == nil)
+		ret = [getObject(*cp1) performSelector: sel_registerName(*cp2)];
+	return ret;
+}
 
-		for(av = avs; av != ave; av++)
-			if(lastchr(*av) == ':')
-			{
-				alloc = malloc(strlen(*av) + 1);
-				argnew = malloc(sizeof *argnew);
-				argnew->next = argdef;
-				argnew->prev = argdef->prev;
-				argnew->arg = *(av + 1);
-				argdef->prev->next = argnew;
-				argdef->prev = argnew;
-			}
+static void syntax(char **avs, char **ave)
+{
+	register struct Argument *argnew;
+	register char **av1;
+	register char **av2;
+
+	for(av1 = avs, av2 = ave; av1 != av2; av1++)
+	{
+		printf("%s\n", *av1);
+		if(lastchr(*av1) == ':')
+		{
+			argnew = malloc(sizeof *argnew);
+			argnew->next = argdef;
+			argnew->prev = argdef->prev;
+			argnew->arg = *(av1 + 1);
+			argdef->prev->next = argnew;
+			argdef->prev = argnew;
+		}
 	}
 }
 
@@ -191,16 +195,19 @@ loop:
 	case '\'':
 	case '"':
 		c1 = c;
+		*linep++ = c1;
 		while((c=readc()) != c1) {
 			if(c == '\n') {
 				error++;
 				peekc = c;
 				return;
 			}
-			*linep++ = c|QUOTE;
+			*linep++ = c;
 		}
+		*linep++ = c1;
 		goto pack;
 
+	case ':':
 	case '&':
 	case ';':
 	case '<':
@@ -212,7 +219,6 @@ loop:
 	case '\n':
 		*linep++ = c;
 		*linep++ = '\0';
-	case ':':
 		return;
 	}
 

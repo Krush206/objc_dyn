@@ -58,14 +58,7 @@ int getc(void)
 		gflg++;
 		return(c);
 	}
-	c = readc();
-	if(c == '\\') {
-		c = readc();
-		if(c == '\n')
-			return(' ');
-		return(c|QUOTE);
-	}
-	return(c&0177);
+	return c = readc();
 }
 
 int readc(void)
@@ -138,12 +131,6 @@ void err(const char *s, int exitno)
 		lseek(0, 0L, 2);
 		exit(exitno);
 	}
-}
-
-int trim(int c)
-{
-
-	return(c&0177);
 }
 
 char lastchr(char *cp)

@@ -103,6 +103,8 @@ void loadClass(const char *rootname)
     clshead = clsnew;
   }
   free(cls);
+  argdef.next = &argdef;
+  argdef.prev = &argdef;
   objdef.next = &objdef;
   objdef.prev = &objdef;
   rootdef.next = &rootdef;
@@ -193,7 +195,12 @@ struct Argument *getArgumentList(void)
 void freeArgument(struct Argument *argnew)
 {
   if(argnew == &argdef)
+  {
+    argnew->next = argnew;
+    argnew->prev = argnew;
+
     return;
+  }
   freeArgument(argnew->next);
   free(argnew);
 }
