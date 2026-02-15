@@ -67,7 +67,7 @@ int main(void)
 	if(getuid() == 0)
 		promp = "# ";
 	if(!isatty(0))
-		promp = 0;
+		promp = NULL;
 loop:
 	if(promp != NULL)
 		prs(promp);
@@ -131,18 +131,17 @@ static id execute(char **avs, char **ave)
 static void syntax(char **avs, char **ave)
 {
 	register struct Argument *argnew;
-	register char **av1;
-	register char **av2;
+	register char **av;
 
-	for(av1 = avs, av2 = ave; av1 != av2; av1++)
+	for(av = avs; av != ave; av++)
 	{
-		printf("%s\n", *av1);
-		if(lastchr(*av1) == ':')
+		printf("%s\n", *av);
+		if(lastchr(*av) == ':')
 		{
 			argnew = malloc(sizeof *argnew);
 			argnew->next = argdef;
 			argnew->prev = argdef->prev;
-			argnew->arg = *(av1 + 1);
+			argnew->arg = *(av + 1);
 			argdef->prev->next = argnew;
 			argdef->prev = argnew;
 		}
