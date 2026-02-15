@@ -41,6 +41,11 @@ static void word(void);
 static id execute(char **, char **);
 static id assign(char **, char **, char **);
 static void syntax(char **, char **);
+static int syntax1(char **, char **);
+static char *syntax2(char **, char **, int);
+static id construct(char **, char **, id);
+static id construct1(char *, id);
+static id construct2(id, SEL);
 
 char *promp;
 char *linep;
@@ -88,7 +93,7 @@ static id assign(char **ap1, char **ap2, char **ap3)
 	}
 	if(getClass(*ap1) != Nil)
 	{
-		err("cannot reassign a class class", 255);
+		err("cannot reassign a class", 255);
 		return nil;
 	}
 	if((obj = getObjectRecord(*ap1)) != NULL)
@@ -109,6 +114,41 @@ static id assign(char **ap1, char **ap2, char **ap3)
 	return alloc->obj = execute(ap2, ap3);
 }
 
+static id construct(char **avs, char **ave, id obj)
+{
+	register char *alloc;
+
+	alloc = syntax2(ave, avs, syntax1(avs, ave));
+	if(alloc[0] != '\0')
+		return construct1(alloc, obj);
+	free(alloc);
+	return obj;
+}
+
+static id construct1(char *alloc, id obj)
+{
+	register id sig;
+	register id ret;
+
+	sig = construct2(obj, sel_registerName(alloc));
+	free(alloc);
+	ret = [getClass("NSInvocation") invocationWithMethodSignature: sig];
+	return ret;
+}
+
+static id construct2(id obj, SEL msg)
+{
+	register id op;
+	register SEL mp;
+
+	op = obj;
+	mp = msg;
+	if(class_isMetaClass(op = object_getClass(op)))
+		return [op methodSignatureForSelector: mp];
+	op = obj;
+	return [op methodSignatureForSelector: mp];
+}
+
 static id execute(char **avs, char **ave)
 {
 	register char **cp1;
@@ -122,10 +162,12 @@ static id execute(char **avs, char **ave)
 	if(equal(*cp1, "@"))
 		return assign(cp1 + 1, cp2, ave);
 	syntax(cp1, ave);
-	ret = [getClass(*cp1) performSelector: sel_registerName(*cp2)];
+	ret = getClass(*cp1);
 	if(ret == nil)
-		ret = [getObject(*cp1) performSelector: sel_registerName(*cp2)];
-	return ret;
+		ret = getObject(*cp1);
+	if(ret == nil)
+		return nil;
+	return construct(cp1, ave, ret);
 }
 
 static void syntax(char **avs, char **ave)
@@ -134,8 +176,6 @@ static void syntax(char **avs, char **ave)
 	register char **av;
 
 	for(av = avs; av != ave; av++)
-	{
-		printf("%s\n", *av);
 		if(lastchr(*av) == ':')
 		{
 			argnew = malloc(sizeof *argnew);
@@ -145,7 +185,38 @@ static void syntax(char **avs, char **ave)
 			argdef->prev->next = argnew;
 			argdef->prev = argnew;
 		}
+}
+
+static int syntax1(char **avs, char **ave)
+{
+	register char **av;
+
+	av = avs;
+	if(av == ave)
+		return 0;
+	if(lastchr(*av) == ':')
+		return syntax1(av + 1, ave) + strlen(*av);
+	return syntax1(av + 1, ave);
+}
+
+static char *syntax2(char **avs, char **ave, int len)
+{
+	register char **av;
+	register int l;
+
+	av = avs;
+	l = len;
+	if(av == ave)
+	{
+		register char *alloc;
+
+		alloc = malloc(l + 1);
+		alloc[0] = '\0';
+		return alloc;
 	}
+	if(lastchr(*av) == ':')
+		return strcat(syntax2(av - 1, ave, l), *av);
+	return syntax2(av - 1, ave, l);
 }
 
 static void main1(void)

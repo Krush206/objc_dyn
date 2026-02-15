@@ -65,7 +65,7 @@ static void loadRootClass(struct Root *rootnew, struct Class *clsnew)
   roothead.next = &rootdef;
   roothead.prev = rootnew;
   roothead.cls = clsnew->root;
-  roothead.meta = object_getClass(clsnew->root);
+  roothead.meta = object_getClass((id) clsnew->root);
   roothead.name = class_getName(clsnew->root);
   rootdef.prev = &roothead;
   rootnew->next = &roothead;
@@ -94,7 +94,7 @@ void loadClass(const char *rootname)
     clsnew->cls = cls[i];
     clsnew->name = class_getName(clsnew->cls);
     clsnew->super = class_getSuperclass(clsnew->cls);
-    clsnew->meta = object_getClass(clsnew->cls);
+    clsnew->meta = object_getClass((id) clsnew->cls);
     clsnew->root = getRootClass(clsnew->cls);
     clsnew->next = &clsdef;
     clsnew->prev = clshead;
@@ -162,6 +162,17 @@ struct Object *getObjectRecord(const char *objname)
   return NULL;
 }
 
+struct Class *getClassRecord(const char *clsname)
+{
+  struct Class *clsnew;
+
+  for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
+    if(equal(clsname, clsnew->name))
+      return clsnew;
+
+  return NULL;
+}
+
 void setRootClass(const char *new)
 {
   free(clsroot);
@@ -174,7 +185,7 @@ void setClass(struct Class *clsnew)
   if(clsnew->cls == Nil)
     return;
   objc_registerClassPair(clsnew->cls);
-  clsnew->meta = object_getClass(clsnew->cls);
+  clsnew->meta = object_getClass((id) clsnew->cls);
   clsnew->root = getRootClass(clsnew->cls);
   clsnew->next = &clsdef;
   clsnew->prev = clsdef.prev;

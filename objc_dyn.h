@@ -63,4 +63,5 @@ extern void err(const char *, int);
 extern char lastchr(char *);
 extern void freeArgument(struct Argument *);
 extern struct Argument *getArgumentList(void);
+extern struct Class *getClassRecord(const char *);
 #endif /* !OBJC_DYN */
