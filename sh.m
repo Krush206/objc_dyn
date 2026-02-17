@@ -44,8 +44,11 @@ static void syntax(char **, char **);
 static int syntax1(char **, char **);
 static char *syntax2(char **, char **, int);
 static id construct(char **, char **, id);
-static id construct1(char *, id);
+static id construct1(char *, id, id);
 static id construct2(id, SEL);
+static void construct3(id, id);
+static id invoke(id, id);
+static id string(char *);
 
 char *promp;
 char *linep;
@@ -118,22 +121,28 @@ static id construct(char **avs, char **ave, id obj)
 {
 	register char *alloc;
 
+	printf("%s\n", *avs);
 	alloc = syntax2(ave, avs, syntax1(avs, ave));
 	if(alloc[0] != '\0')
-		return construct1(alloc, obj);
+		return construct1(alloc, getObject(*avs), obj);
+	printf("free\n");
 	free(alloc);
 	return obj;
 }
 
-static id construct1(char *alloc, id obj)
+static id construct1(char *alloc, id var, id obj)
 {
 	register id sig;
 	register id ret;
 
+	printf("obj: %p\n", obj);
 	sig = construct2(obj, sel_registerName(alloc));
+	printf("sig: %p\n", sig);
 	free(alloc);
 	ret = [getClass("NSInvocation") invocationWithMethodSignature: sig];
-	return ret;
+	printf("ret: %p\n", ret);
+	construct3(ret, sig);
+	return invoke(var, ret);
 }
 
 static id construct2(id obj, SEL msg)
@@ -144,9 +153,32 @@ static id construct2(id obj, SEL msg)
 	op = obj;
 	mp = msg;
 	if(class_isMetaClass(op = object_getClass(op)))
-		return [op methodSignatureForSelector: mp];
+		return [op instanceMethodSignatureForSelector: mp];
 	op = obj;
 	return [op methodSignatureForSelector: mp];
+}
+
+static void construct3(id obj, id sig)
+{
+	register int len;
+	register int i;
+	register struct Argument *argnew;
+
+	len = (int) [sig numberOfArguments];
+	for(i = 2, argnew = argdef->next; i < len; i++, argnew = argnew->next)
+		[obj setArgument: argnew->arg atIndex: i];
+}
+
+static id invoke(id var, id obj)
+{
+	register id op;
+	register intptr_t *ret;
+
+	op = obj;
+	[op invokeWithTarget: var];
+	ret = malloc(sizeof *ret);
+	[op getReturnValue: ret];
+	return *(id *) ret;
 }
 
 static id execute(char **avs, char **ave)
@@ -161,6 +193,10 @@ static id execute(char **avs, char **ave)
 	cp2 = &avs[1];
 	if(equal(*cp1, "@"))
 		return assign(cp1 + 1, cp2, ave);
+	if((*cp1)[0] == '\'' && lastchr(*cp1) == '\'')
+		return string(*cp1);
+	if((*cp1)[0] == '"' && lastchr(*cp1) == '"')
+		return string(*cp1);
 	syntax(cp1, ave);
 	ret = getClass(*cp1);
 	if(ret == nil)
@@ -168,6 +204,21 @@ static id execute(char **avs, char **ave)
 	if(ret == nil)
 		return nil;
 	return construct(cp1, ave, ret);
+}
+
+static id string(char **avs, char **ave)
+{
+	register char *alloc;
+	register int len;
+	register id ret;
+
+	len = strlen(*avs);
+	alloc = malloc(len - 1);
+	(void) strncpy(alloc, *avs + 1, len - 2);
+	alloc[len - 2] = '\0';
+	ret = [getClass("NSString") stringWithCString: alloc];
+	free(alloc);
+	return assign(avs, ave);
 }
 
 static void syntax(char **avs, char **ave)
