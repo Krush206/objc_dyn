@@ -39,23 +39,19 @@
 static void main1(void);
 static void word(void);
 static id execute(char **, char **);
-static id assign(char **, char **, char **);
+static id execute1(id, const char *);
+static id assign(char **, char **);
 static void syntax(char **, char **);
 static int syntax1(char **, char **);
 static char *syntax2(char **, char **, int);
-static id construct(char **, char **, id);
-static id construct1(char *, id, id);
-static id construct2(id, SEL);
-static void construct3(id, id);
-static id invoke(id, id);
-static id string(char *);
+static id string(char **, char **);
 
 char *promp;
 char *linep;
 char *elinep;
 char **argp;
 char **eargp;
-char peekc;
+int peekc;
 int gflg;
 int error;
 
@@ -84,12 +80,14 @@ loop:
 	goto loop;
 }
 
-static id assign(char **ap1, char **ap2, char **ap3)
+static id assign(char **ap1, char **ap2)
 {
 	register struct Object *obj;
 	register struct Object *alloc;
+	register char **ap;
 
-	if(ap2++ == ap3)
+	ap = ap1;
+	if(ap++ == ap2)
 	{
 		err("invalid assignment", 255);
 		return nil;
@@ -112,73 +110,9 @@ static id assign(char **ap1, char **ap2, char **ap3)
 	alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
 	objdef->prev->next = alloc;
 	objdef->prev = alloc;
-	if(ap2 == ap3)
+	if(ap == ap2)
 		return alloc->obj = nil;
-	return alloc->obj = execute(ap2, ap3);
-}
-
-static id construct(char **avs, char **ave, id obj)
-{
-	register char *alloc;
-
-	printf("%s\n", *avs);
-	alloc = syntax2(ave, avs, syntax1(avs, ave));
-	if(alloc[0] != '\0')
-		return construct1(alloc, getObject(*avs), obj);
-	printf("free\n");
-	free(alloc);
-	return obj;
-}
-
-static id construct1(char *alloc, id var, id obj)
-{
-	register id sig;
-	register id ret;
-
-	printf("obj: %p\n", obj);
-	sig = construct2(obj, sel_registerName(alloc));
-	printf("sig: %p\n", sig);
-	free(alloc);
-	ret = [getClass("NSInvocation") invocationWithMethodSignature: sig];
-	printf("ret: %p\n", ret);
-	construct3(ret, sig);
-	return invoke(var, ret);
-}
-
-static id construct2(id obj, SEL msg)
-{
-	register id op;
-	register SEL mp;
-
-	op = obj;
-	mp = msg;
-	if(class_isMetaClass(op = object_getClass(op)))
-		return [op instanceMethodSignatureForSelector: mp];
-	op = obj;
-	return [op methodSignatureForSelector: mp];
-}
-
-static void construct3(id obj, id sig)
-{
-	register int len;
-	register int i;
-	register struct Argument *argnew;
-
-	len = (int) [sig numberOfArguments];
-	for(i = 2, argnew = argdef->next; i < len; i++, argnew = argnew->next)
-		[obj setArgument: argnew->arg atIndex: i];
-}
-
-static id invoke(id var, id obj)
-{
-	register id op;
-	register intptr_t *ret;
-
-	op = obj;
-	[op invokeWithTarget: var];
-	ret = malloc(sizeof *ret);
-	[op getReturnValue: ret];
-	return *(id *) ret;
+	return alloc->obj = execute(ap, ap2);
 }
 
 static id execute(char **avs, char **ave)
@@ -187,38 +121,136 @@ static id execute(char **avs, char **ave)
 	register char **cp2;
 	register id ret;
 
-	if(avs == ave)
-		return nil;
 	cp1 = &avs[0];
+	if(cp1 == ave)
+		return nil;
+	if(equal(cp1[1], "\n"))
+	{
+		err("missing message", 255);
+		return nil;
+	}
 	cp2 = &avs[1];
-	if(equal(*cp1, "@"))
-		return assign(cp1 + 1, cp2, ave);
-	if((*cp1)[0] == '\'' && lastchr(*cp1) == '\'')
-		return string(*cp1);
-	if((*cp1)[0] == '"' && lastchr(*cp1) == '"')
-		return string(*cp1);
+	if(equal(*cp1, "="))
+		return assign(cp2, ave);
+	if(scan(*cp1))
+		return string(cp1, ave);
 	syntax(cp1, ave);
 	ret = getClass(*cp1);
 	if(ret == nil)
 		ret = getObject(*cp1);
 	if(ret == nil)
 		return nil;
-	return construct(cp1, ave, ret);
+	if(argdef->next == argdef)
+		return execute1(ret, *cp2);
+	return execute1(ret, syntax2(ave, cp1, syntax1(cp1, ave)));
+}
+
+static id execute1(id obj, const char *msg)
+{
+	int i;
+	void *arr[10];
+	struct Argument *argnew;
+
+	i = 0;
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
+		i++;
+	if(i > 10)
+	{
+		err("too many arguments", 255);
+		return nil;
+	}
+	i = 0;
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
+		arr[i++] = getObject(argnew->arg);
+	switch(i)
+	{
+	case 0:
+		return objc_msgSend(obj, sel_registerName(msg));
+	case 1:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0]);
+	case 2:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1]);
+	case 3:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2]);
+	case 4:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3]);
+	case 5:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4]);
+	case 6:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5]);
+	case 7:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6]);
+	case 8:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7]);
+	case 9:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8]);
+	case 10:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8],
+								arr[9]);
+	}
+	return nil;
 }
 
 static id string(char **avs, char **ave)
 {
 	register char *alloc;
 	register int len;
-	register id ret;
+	register id obj;
 
-	len = strlen(*avs);
-	alloc = malloc(len - 1);
-	(void) strncpy(alloc, *avs + 1, len - 2);
-	alloc[len - 2] = '\0';
-	ret = [getClass("NSString") stringWithCString: alloc];
+	len = length(avs[0]);
+	alloc = malloc(len + 1);
+	(void) memcpy(alloc, avs[0], len);
+	trim(alloc);
+	obj = [getClass("NSString") stringWithCString: alloc];
 	free(alloc);
-	return assign(avs, ave);
+	syntax(avs, ave);
+	if(argdef->next == argdef)
+		return execute1(obj, avs[1]);
+	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
 }
 
 static void syntax(char **avs, char **ave)
@@ -232,7 +264,7 @@ static void syntax(char **avs, char **ave)
 			argnew = malloc(sizeof *argnew);
 			argnew->next = argdef;
 			argnew->prev = argdef->prev;
-			argnew->arg = *(av + 1);
+			argnew->arg = av[1];
 			argdef->prev->next = argnew;
 			argdef->prev = argnew;
 		}
@@ -256,7 +288,6 @@ static char *syntax2(char **avs, char **ave, int len)
 	register int l;
 
 	av = avs;
-	l = len;
 	if(av == ave)
 	{
 		register char *alloc;
@@ -265,6 +296,7 @@ static char *syntax2(char **avs, char **ave, int len)
 		alloc[0] = '\0';
 		return alloc;
 	}
+	l = len;
 	if(lastchr(*av) == ':')
 		return strcat(syntax2(av - 1, ave, l), *av);
 	return syntax2(av - 1, ave, l);
@@ -302,7 +334,7 @@ static void main1(void)
 
 static void word(void)
 {
-	register char c, c1;
+	register int c, c1;
 
 	*argp++ = linep;
 
@@ -316,16 +348,14 @@ loop:
 	case '\'':
 	case '"':
 		c1 = c;
-		*linep++ = c1;
 		while((c=readc()) != c1) {
 			if(c == '\n') {
 				error++;
 				peekc = c;
 				return;
 			}
-			*linep++ = c;
+			*linep++ = c|QUOTE;
 		}
-		*linep++ = c1;
 		goto pack;
 
 	case ':':

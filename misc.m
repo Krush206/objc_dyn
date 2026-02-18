@@ -35,7 +35,7 @@
 
 int getc(void)
 {
-	register char c;
+	register int c;
 
 	if(peekc) {
 		c = peekc;
@@ -58,19 +58,26 @@ int getc(void)
 		gflg++;
 		return(c);
 	}
-	return c = readc();
+	c = readc();
+	if(c == '\\') {
+		c = readc();
+		if(c == '\n')
+			return(' ');
+		return(c|QUOTE);
+	}
+	return(c&0177);
 }
 
 int readc(void)
 {
-	int rdstat;
+	int rdstat, c;
 	char cc;
 
-	if((rdstat = read(0, &cc, 1)) != 1) {
+	if((rdstat = read(0, &cc, (size_t) 1)) != 1) {
 		if(rdstat==0) exit(0); /* end of file*/
 		else exit(255); /* error */
 	}
-	return(cc);
+	return(c = cc);
 }
 
 void prs(const char *as)
@@ -87,7 +94,7 @@ void putc(int c)
 	char cc;
 
 	cc = c;
-	write(2, &cc, 1);
+	write(2, &cc, (size_t) 1);
 }
 
 void prn(int n)
@@ -128,19 +135,54 @@ void err(const char *s, int exitno)
 	prs(s);
 	prs("\n");
 	if(promp == NULL) {
-		lseek(0, 0L, 2);
+		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
 }
 
-char lastchr(char *cp)
+int length(char *arg)
 {
+	register char *ap;
+	register int c;
+	register int i;
 
-    if (!cp)
-        return (0);
-    if (!*cp)
-        return (0);
-    while (cp[1])
-        cp++;
-    return (*cp);
+	ap = arg;
+	i = 0;
+	while((c = *ap++) != 0)
+		i++;
+	return i;
+}
+
+void trim(char *arg)
+{
+	register char *ap;
+	register int c;
+
+	ap = arg;
+	while((c = *ap) != 0)
+		*ap++ = c & 0177;
+}
+
+int scan(char *arg)
+{
+	register char *ap;
+	register int c;
+
+	ap = arg;
+	while(*ap != '\0')
+		if(((c = *ap++) & QUOTE) == 0)
+			return 0;
+	return 1;
+}
+
+int lastchr(char *cp)
+{
+	register int c;
+
+	c = cp[0];
+	if(c == 0)
+		return c;
+	while((c = cp[1]) != 0)
+		cp++;
+	return c = cp[0];
 }

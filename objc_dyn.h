@@ -5,6 +5,8 @@
 #import <unistd.h>
 #import <objc/objc.h>
 
+#define QUOTE 0200
+
 struct Class {
   Class cls;
   Class super;
@@ -41,7 +43,7 @@ extern char *linep;
 extern char *elinep;
 extern char **argp;
 extern char **eargp;
-extern char peekc;
+extern int peekc;
 extern int gflg;
 extern int error;
 
@@ -60,8 +62,11 @@ extern void prn(int);
 extern int any(int, const char *);
 extern int equal(const char *, const char *);
 extern void err(const char *, int);
-extern char lastchr(char *);
+extern int lastchr(char *);
 extern void freeArgument(struct Argument *);
 extern struct Argument *getArgumentList(void);
 extern struct Class *getClassRecord(const char *);
+extern void trim(char *);
+extern int scan(char *);
+extern int length(char *);
 #endif /* !OBJC_DYN */
