@@ -121,15 +121,15 @@ static id execute(char **avs, char **ave)
 	register char **cp2;
 	register id ret;
 
-	cp1 = &avs[0];
+	cp1 = avs;
 	if(cp1 == ave)
 		return nil;
-	if(equal(cp1[1], "\n"))
+	if(equal(*(cp1 + 1), "\n"))
 	{
 		err("missing message", 255);
 		return nil;
 	}
-	cp2 = &avs[1];
+	cp2 = avs + 1;
 	if(equal(*cp1, "="))
 		return assign(cp2, ave);
 	if(scan(*cp1))
@@ -154,83 +154,83 @@ static id execute1(id obj, const char *msg)
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
 		i++;
-	if(i > 10)
+	if(i > 9)
 	{
 		err("too many arguments", 255);
 		return nil;
 	}
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
-		arr[i++] = getObject(argnew->arg);
+		*(arr + i++) = getObject(argnew->arg);
 	switch(i)
 	{
 	case 0:
 		return objc_msgSend(obj, sel_registerName(msg));
 	case 1:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr);
 	case 2:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1));
 	case 3:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2));
 	case 4:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3));
 	case 5:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4));
 	case 6:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4),
+								*(arr + 5));
 	case 7:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4),
+								*(arr + 5),
+								*(arr + 6));
 	case 8:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4),
+								*(arr + 5),
+								*(arr + 6),
+								*(arr + 7));
 	case 9:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7],
-								arr[8]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4),
+								*(arr + 5),
+								*(arr + 6),
+								*(arr + 7),
+								*(arr + 8));
 	case 10:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7],
-								arr[8],
-								arr[9]);
+		return objc_msgSend(obj, sel_registerName(msg), *arr,
+								*(arr + 1),
+								*(arr + 2),
+								*(arr + 3),
+								*(arr + 4),
+								*(arr + 5),
+								*(arr + 6),
+								*(arr + 7),
+								*(arr + 8),
+								*(arr + 9));
 	}
 	return nil;
 }
@@ -241,30 +241,32 @@ static id string(char **avs, char **ave)
 	register int len;
 	register id obj;
 
-	len = length(avs[0]);
+	len = length(*avs);
 	alloc = malloc(len + 1);
-	(void) memcpy(alloc, avs[0], len);
+	(void) memcpy(alloc, *avs, len);
 	trim(alloc);
 	obj = [getClass("NSString") stringWithCString: alloc];
 	free(alloc);
 	syntax(avs, ave);
 	if(argdef->next == argdef)
-		return execute1(obj, avs[1]);
+		return execute1(obj, *(avs + 1));
 	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
 }
 
 static void syntax(char **avs, char **ave)
 {
 	register struct Argument *argnew;
-	register char **av;
+	register char **av1;
+	register char **av2;
 
-	for(av = avs; av != ave; av++)
-		if(lastchr(*av) == ':')
+	av2 = ave;
+	for(av1 = avs; av1 != av2; av1++)
+		if(lastchr(*av1) == ':')
 		{
 			argnew = malloc(sizeof *argnew);
 			argnew->next = argdef;
 			argnew->prev = argdef->prev;
-			argnew->arg = av[1];
+			argnew->arg = *(av1 + 1);
 			argdef->prev->next = argnew;
 			argdef->prev = argnew;
 		}
@@ -272,34 +274,38 @@ static void syntax(char **avs, char **ave)
 
 static int syntax1(char **avs, char **ave)
 {
-	register char **av;
+	register char **av1;
+	register char **av2;
 
-	av = avs;
-	if(av == ave)
+	av1 = avs;
+	av2 = ave;
+	if(av1 == av2)
 		return 0;
-	if(lastchr(*av) == ':')
-		return syntax1(av + 1, ave) + strlen(*av);
-	return syntax1(av + 1, ave);
+	if(lastchr(*av1) == ':')
+		return syntax1(av1 + 1, av2) + strlen(*av1);
+	return syntax1(av1 + 1, av2);
 }
 
 static char *syntax2(char **avs, char **ave, int len)
 {
-	register char **av;
+	register char **av1;
+	register char **av2;
 	register int l;
 
-	av = avs;
-	if(av == ave)
+	av1 = avs;
+	av2 = ave;
+	l = len;
+	if(av1 == av2)
 	{
 		register char *alloc;
 
 		alloc = malloc(l + 1);
-		alloc[0] = '\0';
+		*alloc = '\0';
 		return alloc;
 	}
-	l = len;
-	if(lastchr(*av) == ':')
-		return strcat(syntax2(av - 1, ave, l), *av);
-	return syntax2(av - 1, ave, l);
+	if(lastchr(*av1) == ':')
+		return strcat(syntax2(av1 - 1, av2, l), *av1);
+	return syntax2(av1 - 1, av2, l);
 }
 
 static void main1(void)
@@ -322,8 +328,8 @@ static void main1(void)
 			err("syntax error", 255);
 		else
 		{
-			const char *name;
-			id obj;
+			register const char *name;
+			register id obj;
 
 			obj = execute(args, argp - 1);
 			name = class_getName([obj class]);

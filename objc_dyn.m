@@ -53,8 +53,6 @@ static void forEachRootClass(struct Root *rootnew)
 
 static void loadRootClass(struct Root *rootnew, struct Class *clsnew)
 {
-  struct Root roothead;
-
   if(clsnew == &clsdef)
   {
     forEachRootClass(rootdef.next);
@@ -62,15 +60,19 @@ static void loadRootClass(struct Root *rootnew, struct Class *clsnew)
 
     return;
   }
-  roothead.next = &rootdef;
-  roothead.prev = rootnew;
-  roothead.cls = clsnew->root;
-  roothead.meta = object_getClass((id) clsnew->root);
-  roothead.name = class_getName(clsnew->root);
-  rootdef.prev = &roothead;
-  rootnew->next = &roothead;
+  {
+    struct Root roothead;
 
-  loadRootClass(&roothead, clsnew->next);
+    roothead.next = &rootdef;
+    roothead.prev = rootnew;
+    roothead.cls = clsnew->root;
+    roothead.meta = object_getClass((id) clsnew->root);
+    roothead.name = class_getName(clsnew->root);
+    rootdef.prev = &roothead;
+    rootnew->next = &roothead;
+
+    loadRootClass(&roothead, clsnew->next);
+  }
 }
 
 void loadClass(const char *rootname)

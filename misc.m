@@ -179,10 +179,10 @@ int lastchr(char *cp)
 {
 	register int c;
 
-	c = cp[0];
+	c = *cp;
 	if(c == 0)
 		return c;
-	while((c = cp[1]) != 0)
+	while((c = *(cp + 1)) != 0)
 		cp++;
-	return c = cp[0];
+	return c = *cp;
 }
