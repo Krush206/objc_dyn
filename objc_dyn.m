@@ -17,7 +17,7 @@ static void allocRootClass(struct Root *rootnew)
   struct Root *roothead;
 
   roothead = rootnew;
-  while((rootnew = rootnew->next) != &rootdef)
+  while(rootnew != &rootdef)
   {
     struct Root *alloc;
 
@@ -30,6 +30,7 @@ static void allocRootClass(struct Root *rootnew)
     rootdef.prev = alloc;
     roothead->next = alloc;
     roothead = alloc;
+    rootnew = rootnew->next;
   }
 }
 
@@ -56,7 +57,7 @@ static void loadRootClass(struct Root *rootnew, struct Class *clsnew)
   if(clsnew == &clsdef)
   {
     forEachRootClass(rootdef.next);
-    allocRootClass(&rootdef);
+    allocRootClass(rootdef.next);
 
     return;
   }

@@ -121,15 +121,15 @@ static id execute(char **avs, char **ave)
 	register char **cp2;
 	register id ret;
 
-	cp1 = avs;
+	cp1 = &avs[0];
 	if(cp1 == ave)
 		return nil;
-	if(equal(*(cp1 + 1), "\n"))
+	if(equal(cp1[1], "\n"))
 	{
 		err("missing message", 255);
 		return nil;
 	}
-	cp2 = avs + 1;
+	cp2 = &avs[1];
 	if(equal(*cp1, "="))
 		return assign(cp2, ave);
 	if(scan(*cp1))
@@ -161,76 +161,76 @@ static id execute1(id obj, const char *msg)
 	}
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
-		*(arr + i++) = getObject(argnew->arg);
+		arr[i++] = getObject(argnew->arg);
 	switch(i)
 	{
 	case 0:
 		return objc_msgSend(obj, sel_registerName(msg));
 	case 1:
-		return objc_msgSend(obj, sel_registerName(msg), *arr);
+		return objc_msgSend(obj, sel_registerName(msg), arr[0]);
 	case 2:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1]);
 	case 3:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2]);
 	case 4:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3]);
 	case 5:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4]);
 	case 6:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4),
-								*(arr + 5));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5]);
 	case 7:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4),
-								*(arr + 5),
-								*(arr + 6));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6]);
 	case 8:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4),
-								*(arr + 5),
-								*(arr + 6),
-								*(arr + 7));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7]);
 	case 9:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4),
-								*(arr + 5),
-								*(arr + 6),
-								*(arr + 7),
-								*(arr + 8));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8]);
 	case 10:
-		return objc_msgSend(obj, sel_registerName(msg), *arr,
-								*(arr + 1),
-								*(arr + 2),
-								*(arr + 3),
-								*(arr + 4),
-								*(arr + 5),
-								*(arr + 6),
-								*(arr + 7),
-								*(arr + 8),
-								*(arr + 9));
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8],
+								arr[9]);
 	}
 	return nil;
 }
@@ -241,15 +241,15 @@ static id string(char **avs, char **ave)
 	register int len;
 	register id obj;
 
-	len = length(*avs);
+	len = length(avs[0]);
 	alloc = malloc(len + 1);
-	(void) memcpy(alloc, *avs, len);
+	(void) memcpy(alloc, avs[0], len);
 	trim(alloc);
 	obj = [getClass("NSString") stringWithCString: alloc];
 	free(alloc);
 	syntax(avs, ave);
 	if(argdef->next == argdef)
-		return execute1(obj, *(avs + 1));
+		return execute1(obj, avs[1]);
 	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
 }
 
@@ -266,7 +266,7 @@ static void syntax(char **avs, char **ave)
 			argnew = malloc(sizeof *argnew);
 			argnew->next = argdef;
 			argnew->prev = argdef->prev;
-			argnew->arg = *(av1 + 1);
+			argnew->arg = av1[1];
 			argdef->prev->next = argnew;
 			argdef->prev = argnew;
 		}
@@ -300,7 +300,7 @@ static char *syntax2(char **avs, char **ave, int len)
 		register char *alloc;
 
 		alloc = malloc(l + 1);
-		*alloc = '\0';
+		alloc[0] = '\0';
 		return alloc;
 	}
 	if(lastchr(*av1) == ':')

@@ -169,8 +169,8 @@ int scan(char *arg)
 	register int c;
 
 	ap = arg;
-	while(*ap != '\0')
-		if(((c = *ap++) & QUOTE) == 0)
+	while((c = *ap++) != 0)
+		if((c & QUOTE) == 0)
 			return 0;
 	return 1;
 }
@@ -179,10 +179,10 @@ int lastchr(char *cp)
 {
 	register int c;
 
-	c = *cp;
+	c = cp[0];
 	if(c == 0)
 		return c;
-	while((c = *(cp + 1)) != 0)
+	while((c = cp[1]) != 0)
 		cp++;
-	return c = *cp;
+	return c = cp[0];
 }
