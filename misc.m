@@ -173,7 +173,8 @@ trim(char *arg)
 		*ap++ = c & 0177;
 }
 
-int scan(char *arg)
+int
+scan(char *arg)
 {
 	register char *ap;
 	register int c;
