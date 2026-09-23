@@ -46,14 +46,14 @@ static int syntax1(char **, char **);
 static char *syntax2(char **, char **, int);
 static id string(char **, char **);
 
-char *promp;
-char *linep;
-char *elinep;
-char **argp;
-char **eargp;
-int peekc;
-int gflg;
-int error;
+static char *promp;
+static char *linep;
+static char *elinep;
+static char **argp;
+static char **eargp;
+static int peekc;
+static int gflg;
+static int error;
 
 static char line[LINSIZ];
 static char *args[ARGSIZ];
@@ -62,7 +62,8 @@ static struct Object *objdef;
 
 static struct Argument *argdef;
 
-int main(void)
+int
+main(void)
 {
 	loadClass("NSObject");
 	objdef = getObjectList();
@@ -80,7 +81,8 @@ loop:
 	goto loop;
 }
 
-static id assign(char **ap1, char **ap2)
+static id
+assign(char **ap1, char **ap2)
 {
 	register struct Object *obj;
 	register struct Object *alloc;
@@ -115,7 +117,8 @@ static id assign(char **ap1, char **ap2)
 	return alloc->obj = execute(ap, ap2);
 }
 
-static id execute(char **avs, char **ave)
+static id
+execute(char **avs, char **ave)
 {
 	register char **cp1;
 	register char **cp2;
@@ -145,7 +148,8 @@ static id execute(char **avs, char **ave)
 	return execute1(ret, syntax2(ave, cp1, syntax1(cp1, ave)));
 }
 
-static id execute1(id obj, const char *msg)
+static id
+execute1(id obj, const char *msg)
 {
 	int i;
 	void *arr[10];
@@ -235,7 +239,8 @@ static id execute1(id obj, const char *msg)
 	return nil;
 }
 
-static id string(char **avs, char **ave)
+static id
+string(char **avs, char **ave)
 {
 	register char *alloc;
 	register int len;
@@ -253,7 +258,8 @@ static id string(char **avs, char **ave)
 	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
 }
 
-static void syntax(char **avs, char **ave)
+static void
+syntax(char **avs, char **ave)
 {
 	register struct Argument *argnew;
 	register char **av1;
@@ -272,7 +278,8 @@ static void syntax(char **avs, char **ave)
 		}
 }
 
-static int syntax1(char **avs, char **ave)
+static int
+syntax1(char **avs, char **ave)
 {
 	register char **av1;
 	register char **av2;
@@ -286,7 +293,8 @@ static int syntax1(char **avs, char **ave)
 	return syntax1(av1 + 1, av2);
 }
 
-static char *syntax2(char **avs, char **ave, int len)
+static char *
+syntax2(char **avs, char **ave, int len)
 {
 	register char **av1;
 	register char **av2;
@@ -308,7 +316,8 @@ static char *syntax2(char **avs, char **ave, int len)
 	return syntax2(av1 - 1, av2, l);
 }
 
-static void main1(void)
+static void
+main1(void)
 {
 	register char *cp;
 
@@ -338,7 +347,8 @@ static void main1(void)
 	}
 }
 
-static void word(void)
+static void
+word(void)
 {
 	register int c, c1;
 
