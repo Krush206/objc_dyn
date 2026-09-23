@@ -46,14 +46,14 @@ static int syntax1(char **, char **);
 static char *syntax2(char **, char **, int);
 static id string(char **, char **);
 
-static char *promp;
-static char *linep;
-static char *elinep;
-static char **argp;
-static char **eargp;
-static int peekc;
-static int gflg;
-static int error;
+char *promp;
+char *linep;
+char *elinep;
+char **argp;
+char **eargp;
+int peekc;
+int gflg;
+int error;
 
 static char line[LINSIZ];
 static char *args[ARGSIZ];
