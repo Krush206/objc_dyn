@@ -8,34 +8,34 @@
 #define QUOTE 0200
 
 struct Class {
-  Class cls;
-  Class super;
-  Class root;
-  Class meta;
-  const char *name;
-  struct Class *next;
-  struct Class *prev;
+	Class cls;
+	Class super;
+	Class root;
+	Class meta;
+	const char *name;
+	struct Class *next;
+	struct Class *prev;
 };
 
 struct Root {
-  Class cls;
-  Class meta;
-  const char *name;
-  struct Root *next;
-  struct Root *prev;
+	Class cls;
+	Class meta;
+	const char *name;
+	struct Root *next;
+	struct Root *prev;
 };
 
 struct Object {
-  id obj;
-  char *name;
-  struct Object *next;
-  struct Object *prev;
+	id obj;
+	char *name;
+	struct Object *next;
+	struct Object *prev;
 };
 
 struct Argument {
-  const char *arg;
-  struct Argument *next;
-  struct Argument *prev;
+	const char *arg;
+	struct Argument *next;
+	struct Argument *prev;
 };
 
 extern char *promp;
