@@ -33,7 +33,8 @@
 
 #import "objc_dyn.h"
 
-int getc(void)
+int
+getc(void)
 {
 	register int c;
 
@@ -68,7 +69,8 @@ int getc(void)
 	return(c&0177);
 }
 
-int readc(void)
+int
+readc(void)
 {
 	int rdstat, c;
 	char cc;
@@ -80,7 +82,8 @@ int readc(void)
 	return(c = cc);
 }
 
-void prs(const char *as)
+void
+prs(const char *as)
 {
 	register const char *s;
 
@@ -89,7 +92,8 @@ void prs(const char *as)
 		putc(*s++);
 }
 
-void putc(int c)
+void
+putc(int c)
 {
 	char cc;
 
@@ -97,7 +101,8 @@ void putc(int c)
 	write(2, &cc, (size_t) 1);
 }
 
-void prn(int n)
+void
+prn(int n)
 {
 	register int a;
 
@@ -106,7 +111,8 @@ void prn(int n)
 	putc(n%10 + '0');
 }
 
-int any(int c, const char *as)
+int
+any(int c, const char *as)
 {
 	register const char *s;
 
@@ -117,7 +123,8 @@ int any(int c, const char *as)
 	return(0);
 }
 
-int equal(const char *as1, const char *as2)
+int
+equal(const char *as1, const char *as2)
 {
 	register const char *s1, *s2;
 
@@ -129,7 +136,8 @@ int equal(const char *as1, const char *as2)
 	return(0);
 }
 
-void err(const char *s, int exitno)
+void
+err(const char *s, int exitno)
 {
 
 	prs(s);
@@ -140,7 +148,8 @@ void err(const char *s, int exitno)
 	}
 }
 
-int length(char *arg)
+int
+length(char *arg)
 {
 	register char *ap;
 	register int c;
@@ -153,7 +162,8 @@ int length(char *arg)
 	return i;
 }
 
-void trim(char *arg)
+void
+trim(char *arg)
 {
 	register char *ap;
 	register int c;
@@ -175,7 +185,8 @@ int scan(char *arg)
 	return 1;
 }
 
-int lastchr(char *cp)
+int
+lastchr(char *cp)
 {
 	register int c;
 
