@@ -33,41 +33,7 @@
 
 #import "objc_dyn.h"
 
-int
-getc(void)
-{
-	register int c;
-
-	if(peekc) {
-		c = peekc;
-		peekc = 0;
-		return(c);
-	}
-	if(argp > eargp) {
-		argp -= 10;
-		while((c=getc()) != '\n');
-		argp += 10;
-		err("Too many args",255);
-		gflg++;
-		return(c);
-	}
-	if(linep > elinep) {
-		linep -= 10;
-		while((c=getc()) != '\n');
-		linep += 10;
-		err("Too many characters",255);
-		gflg++;
-		return(c);
-	}
-	c = readc();
-	if(c == '\\') {
-		c = readc();
-		if(c == '\n')
-			return(' ');
-		return(c|QUOTE);
-	}
-	return(c&0177);
-}
+static char subchar = '$';
 
 int
 readc(void)
@@ -149,44 +115,6 @@ err(const char *s, int exitno)
 }
 
 int
-length(char *arg)
-{
-	register char *ap;
-	register int c;
-	register int i;
-
-	ap = arg;
-	i = 0;
-	while((c = *ap++) != 0)
-		i++;
-	return i;
-}
-
-void
-trim(char *arg)
-{
-	register char *ap;
-	register int c;
-
-	ap = arg;
-	while((c = *ap) != 0)
-		*ap++ = c & 0177;
-}
-
-int
-scan(char *arg)
-{
-	register char *ap;
-	register int c;
-
-	ap = arg;
-	while((c = *ap++) != 0)
-		if((c & QUOTE) == 0)
-			return 0;
-	return 1;
-}
-
-int
 lastchr(char *cp)
 {
 	register int c;
@@ -197,4 +125,119 @@ lastchr(char *cp)
 	while((c = cp[1]) != 0)
 		cp++;
 	return c = cp[0];
+}
+
+/*	flag: !DOLREPL ==> no substitution, DOLREPL ==> substitute,
+	DOLREPQ ==> quoted substitution: "$1" = value of $1 for sure */
+int
+getc(int flag)
+{
+	register char c;
+
+	if(peekc) {
+		c = peekc;
+		peekc = 0;
+		return(c);
+	}
+	if(argp > eargp) {
+		argp -= 10;
+		while((c=getc(!DOLREPL)) != '\n');
+		argp += 10;
+		err(ERR_ARGS, 255);
+		gflg++;
+		return(c);
+	}
+	if(linep > elinep) {
+		linep -= 10;
+		while((c=getc(!DOLREPL)) != '\n');
+		linep += 10;
+		err(ERR_CHAR, 255);
+		gflg++;
+		return(c);
+	}
+getd:
+	if(dolp) {
+		if (c = *dolp++) {
+			if (flag == DOLREPQ)
+				c |= QUOTE;
+			return c;
+		}
+		if (idolp && ++idolp < dolc) {
+			dolp = dolv[idolp];
+			return(' ');
+		}
+		dolp = 0;
+	}
+	c = readc();
+	if(c == subchar && flag) {
+		c = readc();
+		if(c>='0' && c<='9') {
+			if(c-'0' < dolc)
+				dolp = dolv[c-'0'];
+			goto getd;
+		}
+		else if(c>='a' && c<='z') {
+			dolp = seta[c-'a'];
+			goto getd;
+		}
+		else if(c == '$') {
+			dolp = pidp;
+			goto getd;
+		}
+		/* $* = $1 $2 .... */
+		else if (c == '*') {
+			if (dolc > 1) {
+				idolp = 1;
+				dolp = dolv[1];
+			}
+			goto getd;
+		}
+		else
+			if(c != '\n')  c = readc();
+	}
+	return(c&0177);
+}
+
+void
+scan(struct Tree *at, int (*f)(int))
+{
+	register char *p, **t, c;
+
+	t = at->DARR;
+	while((p = *t++))
+		while((c = *p))
+			*p++ = (*f)(c);
+}
+
+int
+tglob(int c)
+{
+	if(any(c, "[?*"))
+		gflg = 1;
+	return(c);
+}
+
+int
+trim(int c)
+{
+	return(c&0177);
+}
+
+char *
+itoa(int n)
+{
+	register int i, j;
+	register char *cp;
+	static char str[NUMSIZ];
+
+	j = n;
+	cp = &str[sizeof str - 1];
+	for (;;) {
+		*cp = j % 10 + '0';
+		j /= 10;
+		if(j == 0)
+			return cp;
+		cp--;
+	}
+	return NULL;
 }
