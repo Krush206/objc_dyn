@@ -4,6 +4,7 @@ static void allocRootClass(struct Root *);
 static void forEachRootClass(struct Root *);
 static void loadRootClass(struct Root *, struct Class *);
 static Class getRootClass(Class);
+static void resolveLinks(void);
 
 static struct Argument argdef;
 static struct Object objdef;
@@ -17,7 +18,9 @@ allocRootClass(struct Root *rootnew)
 {
 	struct Root *roothead;
 
-	roothead = rootnew;
+	roothead = &rootdef;
+	rootdef.next = roothead;
+	rootdef.prev = roothead;
 	while(rootnew != &rootdef)
 	{
 		struct Root *alloc;
@@ -89,6 +92,7 @@ loadClass(const char *rootname)
 	clsnew->prev = clsnew;
 	clshead = clsnew;
 	init = NULL;
+	resolveLinks();
 	while((cls = objc_next_class(&init)) != Nil)
 	{
 		clsnew = malloc(sizeof *clsnew);
@@ -103,7 +107,6 @@ loadClass(const char *rootname)
 		clshead->next = clsnew;
 		clshead = clsnew;
 	}
-	free(cls);
 	argdef.next = &argdef;
 	argdef.prev = &argdef;
 	objdef.next = &objdef;
@@ -204,4 +207,12 @@ freeArgument(struct Argument *argnew)
 	}
 	freeArgument(argnew->next);
 	free(argnew);
+}
+
+static void
+resolveLinks(void)
+{
+	extern void __objc_resolve_class_links(void);
+
+	__objc_resolve_class_links();
 }
