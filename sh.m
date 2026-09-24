@@ -33,18 +33,16 @@
 
 #import "objc_dyn.h"
 
-#define LINSIZ 1000
-#define ARGSIZ 50
-
 static void main1(void);
 static void word(void);
-static id execute(char **, char **);
+static void execute(struct Tree *, int *, int *);
 static id execute1(id, const char *);
 static id assign(char **, char **);
-static void syntax(char **, char **);
-static int syntax1(char **, char **);
-static char *syntax2(char **, char **, int);
-static id string(char **, char **);
+static struct Tree *syntax(char **, char **);
+static struct Tree *syn1(char **, char **);
+static struct Tree *syn2(char **, char **);
+static struct Tree *syn3(char **, char **);
+static struct Tree *tree(void);
 
 char *promp;
 char *linep;
@@ -54,6 +52,14 @@ char **eargp;
 int peekc;
 int gflg;
 int error;
+int dolc;
+int idolp;
+char pidp[NUMSIZ];
+char *dolp;
+char **dolv;
+char seta[26][EXPSIZ];
+
+static int treec;
 
 static char line[LINSIZ];
 static char *args[ARGSIZ];
@@ -62,10 +68,14 @@ static struct Object *objdef;
 
 static struct Argument *argdef;
 
+static struct Tree trebuf[TRESIZ];
+
+static jmp_buf jmp;
+
 int
 main(void)
 {
-	loadClass("NSObject");
+	loadClass("Object");
 	objdef = getObjectList();
 	argdef = getArgumentList();
 	promp = "% ";
@@ -76,76 +86,9 @@ main(void)
 loop:
 	if(promp != NULL)
 		prs(promp);
-	peekc = getc();
+	peekc = getc(!DOLREPL);
 	main1();
 	goto loop;
-}
-
-static id
-assign(char **ap1, char **ap2)
-{
-	register struct Object *obj;
-	register struct Object *alloc;
-	register char **ap;
-
-	ap = ap1;
-	if(ap++ == ap2)
-	{
-		err("invalid assignment", 255);
-		return nil;
-	}
-	if(getClass(*ap1) != Nil)
-	{
-		err("cannot reassign a class", 255);
-		return nil;
-	}
-	if((obj = getObjectRecord(*ap1)) != NULL)
-	{
-		obj->prev->next = obj->next;
-		obj->next->prev = obj->prev;
-		free(obj->name);
-		free(obj);
-	}
-	alloc = malloc(sizeof *alloc);
-	alloc->next = objdef;
-	alloc->prev = objdef->prev;
-	alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
-	objdef->prev->next = alloc;
-	objdef->prev = alloc;
-	if(ap == ap2)
-		return alloc->obj = nil;
-	return alloc->obj = execute(ap, ap2);
-}
-
-static id
-execute(char **avs, char **ave)
-{
-	register char **cp1;
-	register char **cp2;
-	register id ret;
-
-	cp1 = &avs[0];
-	if(cp1 == ave)
-		return nil;
-	if(equal(cp1[1], "\n"))
-	{
-		err("missing message", 255);
-		return nil;
-	}
-	cp2 = &avs[1];
-	if(equal(*cp1, "="))
-		return assign(cp2, ave);
-	if(scan(*cp1))
-		return string(cp1, ave);
-	syntax(cp1, ave);
-	ret = getClass(*cp1);
-	if(ret == nil)
-		ret = getObject(*cp1);
-	if(ret == nil)
-		return nil;
-	if(argdef->next == argdef)
-		return execute1(ret, *cp2);
-	return execute1(ret, syntax2(ave, cp1, syntax1(cp1, ave)));
 }
 
 static id
@@ -213,87 +156,112 @@ execute1(id obj, const char *msg)
 	return nil;
 }
 
-static id
-string(char **avs, char **ave)
+static void
+word(void)
 {
-	register char *alloc;
-	register int len;
-	register id obj;
+	register char c, c1;
+	register dolflag;
 
-	len = length(avs[0]);
-	alloc = malloc(len + 1);
-	(void) memcpy(alloc, avs[0], len);
-	trim(alloc);
-	obj = [getClass("NSString") stringWithCString: alloc];
-	free(alloc);
-	syntax(avs, ave);
-	if(argdef->next == argdef)
-		return execute1(obj, avs[1]);
-	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
+	*argp++ = linep;
+
+loop:
+	switch(c = getc(DOLREPL)) {
+
+	case ' ':
+	case '\t':
+		goto loop;
+
+	case '\'':	/* '...' : what you see is what you get */
+	case '"':	/* "..." : \", \$, $ substitution */
+		c1 = c;
+		dolflag = (c == '"' && !dolp) ? DOLREPQ : !DOLREPL;
+		while((c=getc(dolflag)) != c1) {
+			if(c == '\n') {
+				error++;
+				peekc = c;
+				return;
+			}
+			if (c1 == '"' && c == '\\' &&
+				((peekc = getc(!DOLREPL)) == '$' ||
+				peekc == '"')) {
+					c = peekc;
+					peekc = 0;
+			}
+			*linep++ = c|QUOTE;
+		}
+		goto pack;
+
+	case '&':
+	case '|':
+		*linep++ = c;
+		if((peekc=getc(DOLREPL)) == c)
+			peekc = 0;
+		else
+			linep--;
+	case ';':
+	case '<':
+	case '>':
+	case '(':
+	case ')':
+	case '^':
+	case '\n':
+		*linep++ = c;
+		*linep++ = '\0';
+		return;
+	case '\\':
+		if ((c=getc(!DOLREPL))=='\n') goto loop;
+		else {
+			c |= QUOTE;
+			break;
+		}
+	}
+
+	peekc = c;
+
+pack:
+	for(;;) {
+		if ((c = getc(DOLREPL))=='\\') {
+			if ((c=getc(!DOLREPL))=='\n') c = ' ';
+			else c |= QUOTE;
+		}
+		if(any(c, " '\"\t;&<>()|^\n:")) {
+			peekc = c;
+			if(any(c, "\"'"))
+				goto loop;
+			if(c == ':')
+				*linep++ = getc(!DOLREPL);
+			*linep++ = '\0';
+			return;
+		}
+		*linep++ = c;
+	}
 }
 
 static void
-syntax(char **avs, char **ave)
+rdval(int i, char *na)
 {
-	register struct Argument *argnew;
-	register char **av1;
-	register char **av2;
+	register char *st, *np;
+	char c;
 
-	av2 = ave;
-	for(av1 = avs; av1 != av2; av1++)
-		if(lastchr(*av1) == ':')
-		{
-			argnew = malloc(sizeof *argnew);
-			argnew->next = argdef;
-			argnew->prev = argdef->prev;
-			argnew->arg = av1[1];
-			argdef->prev->next = argnew;
-			argdef->prev = argnew;
-		}
-}
-
-static int
-syntax1(char **avs, char **ave)
-{
-	register char **av1;
-	register char **av2;
-
-	av1 = avs;
-	av2 = ave;
-	if(av1 == av2)
-		return 0;
-	if(lastchr(*av1) == ':')
-		return syntax1(av1 + 1, av2) + strlen(*av1);
-	return syntax1(av1 + 1, av2);
-}
-
-static char *
-syntax2(char **avs, char **ave, int len)
-{
-	register char **av1;
-	register char **av2;
-	register int l;
-
-	av1 = avs;
-	av2 = ave;
-	l = len;
-	if(av1 == av2)
-	{
-		register char *alloc;
-
-		alloc = malloc(l + 1);
-		alloc[0] = '\0';
-		return alloc;
+	st = seta[i];
+	np = na;
+	if(np == 0)
+		goto null;
+	for (;;) {
+		c = *np++ & 0177;
+		*st++ = c;
+		if(c=='\n' || c=='\0') break;
 	}
-	if(lastchr(*av1) == ':')
-		return strcat(syntax2(av1 - 1, av2, l), *av1);
-	return syntax2(av1 - 1, av2, l);
+	if(c=='\n') st++;
+null:
+	*st = '\0';
 }
 
 static void
 main1(void)
 {
-	register char *cp;
+	register char  *cp;
+	register struct Tree *t;
 
 	argp = args;
 	eargp = args+ARGSIZ-1;
@@ -301,82 +269,440 @@ main1(void)
 	elinep = line+LINSIZ-1;
 	error = 0;
 	gflg = 0;
-	freeArgument(argdef->next);
 	do {
 		cp = linep;
 		word();
 	} while(*cp != '\n');
+	treec = 0;
 	if(gflg == 0) {
-		if(error != 0)
-			err("syntax error", 255);
-		else
-		{
-			register const char *name;
-			register id obj;
-
-			obj = execute(args, argp - 1);
-			name = class_get_class_name([obj class]);
-			(void) printf("%s <%p>\n", name, obj);
+		if(error == 0) {
+			setjmp(jmp);
+			if (error)
+				return;
+			t = syntax(args, argp);
 		}
+		if(error != 0)
+			err(ERR_SYNTAX, 255); else
+			execute(t, 0, 0);
 	}
 }
 
 static void
-word(void)
+execute(struct Tree *t, int *pf1, int *pf2)
 {
-	register int c, c1;
+	int i, f, pv[2];
+	register struct Tree *t1;
+	register char *cp1, *cp2;
 
-	*argp++ = linep;
+	if(t == 0)
+		return;
+	switch(t->DTYP) {
+		int p;
 
-loop:
-	switch(c = getc()) {
-
-	case ' ':
-	case '\t':
-		goto loop;
-
-	case '\'':
-	case '"':
-		c1 = c;
-		while((c=readc()) != c1) {
-			if(c == '\n') {
-				error++;
-				peekc = c;
-				return;
+	case TCOM:
+		cp1 = t->DARR[0];
+		cp2 = t->DARR[1];
+		if(equal(cp1, "=")) {
+			if(cp2 == 0) {
+				err(ERR_EQUALS, 255);
+				break;
 			}
-			*linep++ = c|QUOTE;
+			i = *cp2 - 'a';
+			if(i>25 || i<0) {
+				err(ERR_EQUALS, 255);
+				break;
+			}
+			rdval(i, t->DARR[2]);
+			break;
 		}
-		goto pack;
+		if(equal(cp1, "chdir")) {
+			if(t->DARR[1] != 0) {
+				if(chdir(t->DARR[1]) < 0) {
+					prs(cp1);
+					err(ERR_BADDIR, 255);
+				}
+				break;
+			}
+			prs(cp1);
+			err(ERR_COUNT, 255);
+			break;
+		}
+		if(equal(cp1, "shift")) {
+			if(dolc < 1) {
+				prs("shift: no args\n");
+				break;
+			}
+			dolv[1] = dolv[0];
+			dolv++;
+			dolc--;
+			break;
+		}
+		if(equal(cp1, "login")) {
+			if(promp != 0) {
+				execv("/bin/login", t->DARR);
+			}
+			prs("login: cannot execute\n");
+			break;
+		}
+		if(equal(cp1, "newgrp")) {
+			if(promp != 0) {
+				execv("/bin/newgrp", t->DARR);
+			}
+			prs("newgrp: cannot execute\n");
+			break;
+		}
+		if(equal(cp1, "wait")) {
+			pwait(-1);
+			break;
+		}
+		if(equal(cp1, ":"))
+			break;
 
-	case ':':
+	case TPAR:
+		f = t->DFLG;
+		i = 0;
+		if((f&FPAR) == 0)
+			i = fork();
+		if(i == -1) {
+			err(ERR_AGAIN, 255);
+			break;
+		}
+		if(i != 0) {
+			if((f&FPIN) != 0) {
+				close(pf1[0]);
+				close(pf1[1]);
+			}
+			if((f&FPRS) != 0) {
+				prn(i);
+				prs("\n");
+			}
+			if((f&FAND) != 0)
+				break;
+			if((f&FPOU) == 0)
+				pwait(i);
+			break;
+		}
+		if(t->DLEF != 0) {
+			close(0);
+			i = open(t->DLPT, 0);
+			if(i < 0) {
+				prs(t->DLPT);
+				err(ERR_OPEN, 255);
+				exit(255);
+			}
+		}
+		if(t->DRIT != 0) {
+			if((f&FCAT) != 0) {
+				i = open(t->DRPT, 1);
+				if(i >= 0) {
+					lseek(i, 0L, 2);
+					goto f1;
+				}
+			}
+			i = creat(t->DRPT, 0666);
+			if(i < 0) {
+				prs(t->DRPT);
+				err(ERR_CREATE, 255);
+				exit(255);
+			}
+		f1:
+			close(1);
+			dup(i);
+			close(i);
+		}
+		if((f&FPIN) != 0) {
+			close(0);
+			dup(pf1[0]);
+			close(pf1[0]);
+			close(pf1[1]);
+		}
+		if((f&FPOU) != 0) {
+			close(1);
+			dup(pf2[1]);
+			close(pf2[0]);
+			close(pf2[1]);
+		}
+		if((f&FINT)!=0 && t->DLEF==0 && (f&FPIN)==0) {
+			close(0);
+			open("/dev/null", 0);
+		}
+		if((f&FINT) == 0) {
+			signal(SIGINT, SIG_IGN);
+			signal(SIGQUIT, SIG_IGN);
+		}
+		if(t->DTYP == TPAR) {
+			if((t1 = t->DSTR))
+				t1->DFLG |= f&FINT;
+			execute(t1, pf1, pf2);
+			exit(255);
+		}
+		gflg = 0;
+		scan(t, tglob);
+		if(gflg) {
+			t->DSPT = "/etc/glob";
+			execv(t->DSPT, &t->DSPT);
+			prs("glob: cannot execute\n");
+			exit(255);
+		}
+		scan(t, trim);
+		*linep = 0;
+		texec(t->DPTR, t);
+		cp1 = linep;
+		cp2 = getenv("PATH");
+		p = 0;
+		while((*cp1 = *cp2++)) {
+			p++;
+			if(*cp1 == ':') {
+				*cp1++ = '/';
+				cp2 = t->DARR[0];
+				while((*cp1++ = *cp2++));
+				texec(linep, t);
+				cp1 = linep;
+				cp2 = &getenv("PATH")[p];
+				continue;
+			}
+			cp1++;
+		}
+		*cp1++ = '/';
+		cp2 = t->DARR[0];
+		while((*cp1++ = *cp2++));
+		texec(linep, t);
+		prs(t->DARR[0]);
+		err(ERR_FOUND, 255);
+		exit(255);
+
+	case TFIL:
+		f = t->DFLG;
+		pipe(pv);
+		t1 = t->DLEF;
+		t1->DFLG |= FPOU | (f&(FPIN|FINT|FPRS));
+		execute(t1, pf1, pv);
+		t1 = t->DRIT;
+		t1->DFLG |= FPIN | (f&(FPOU|FINT|FAND|FPRS));
+		execute(t1, pv, pf2);
+		break;
+
+	case TLST:
+		f = t->DFLG&FINT;
+		if((t1 = t->DLEF))
+			t1->DFLG |= f;
+		execute(t1, pf1, pf2);
+		if((t1 = t->DRIT))
+			t1->DFLG |= f;
+		execute(t1, pf1, pf2);
+	}
+}
+
+/*
+ * syntax
+ *	empty
+ *	syn1
+ */
+
+static struct Tree *
+syntax(char **p1, char **p2)
+{
+	while(p1 != p2) {
+		if(any(**p1, ";&\n"))
+			p1++; else
+			return(syn1(p1, p2));
+	}
+	return(0);
+}
+
+/*
+ * syn1
+ *	syn2
+ *	syn2 & syntax
+ *	syn2 ; syntax
+ */
+
+static struct Tree *
+syn1(char **p1, char **p2)
+{
+	register char **p;
+	register struct Tree *t;
+	int l;
+
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(**p) {
+
+	case '(':
+		l++;
+		continue;
+
+	case ')':
+		l--;
+		continue;
+
 	case '&':
 	case ';':
-	case '<':
-	case '>':
+	case '\n':
+		if(l == 0) {
+			register struct Tree *t1;
+
+			l = **p;
+			t = tree();
+			t->DTYP = TLST;
+			t->DLEF = syn2(p1, p);
+			t->DFLG = 0;
+			if(l == '&') {
+				t1 = t->DLEF;
+				t->DFLG |= FAND|FPRS|FINT;
+			}
+			if((t1 = syntax(p+1, p2)))
+				t->DRIT = t1; else
+				t->DRIT = 0;
+			return(t);
+		}
+	}
+	if(l == 0)
+		return(syn2(p1, p2));
+	error++;
+	return(0);
+}
+
+/*
+ * syn2
+ *	syn3
+ *	syn3 | syn2
+ */
+
+static struct Tree *
+syn2(char **p1, char **p2)
+{
+	register char **p;
+	register int l;
+	register struct Tree *t;
+
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(**p) {
+
 	case '(':
+		l++;
+		continue;
+
 	case ')':
+		l--;
+		continue;
+
 	case '|':
 	case '^':
-	case '\n':
-		*linep++ = c;
-		*linep++ = '\0';
-		return;
-	}
-
-	peekc = c;
-
-pack:
-	for(;;) {
-		c = getc();
-		if(any(c, " :'\"\t;&<>()|^\n")) {
-			peekc = c;
-			if(any(c, "\"'"))
-				goto loop;
-			if(c == ':')
-				*linep++ = getc();
-			*linep++ = '\0';
-			return;
+		if(l == 0) {
+			t = tree();
+			t->DTYP = TFIL;
+			t->DLEF = syn3(p1, p);
+			t->DRIT = syn2(p+1, p2);
+			t->DFLG = 0;
+			return(t);
 		}
-		*linep++ = c;
 	}
+	return(syn3(p1, p2));
+}
+
+/*
+ * syn3
+ *	( syn1 ) [ < in  ] [ > out ]
+ *	word word* [ < in ] [ > out ]
+ */
+
+static struct Tree *
+syn3(char **p1, char **p2)
+{
+	register char **p;
+	char **lp, **rp, *i, *o;
+	register struct Tree *t;
+	int n, l, c, flg;
+
+	flg = 0;
+	if(**p2 == ')')
+		flg |= FPAR;
+	lp = 0;
+	rp = 0;
+	i = 0;
+	o = 0;
+	n = 0;
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(c = **p) {
+
+	case '(':
+		if(l == 0) {
+			if(lp != 0)
+				error++;
+			lp = p+1;
+		}
+		l++;
+		continue;
+
+	case ')':
+		l--;
+		if(l == 0)
+			rp = p;
+		continue;
+
+	case '>':
+		p++;
+		if(p!=p2 && **p=='>')
+			flg |= FCAT; else
+			p--;
+
+	case '<':
+		if(l == 0) {
+			p++;
+			if(p == p2) {
+				error++;
+				p--;
+			}
+			if(any(**p, "<>("))
+				error++;
+			if(c == '<') {
+				if(i != 0)
+					error++;
+				i = *p;
+				continue;
+			}
+			if(o != 0)
+				error++;
+			o = *p;
+		}
+		continue;
+
+	default:
+		if(l == 0)
+			p1[n++] = *p;
+	}
+	if(lp != 0) {
+		if(n != 0)
+			error++;
+		t = tree();
+		t->DTYP = TPAR;
+		t->DSTR = syn1(lp, rp);
+		goto out;
+	}
+	if(n == 0)
+		error++;
+	p1[n++] = 0;
+	t = tree();
+	t->DTYP = TCOM;
+	for(l=0; l<n; l++)
+		t->DARR[l] = p1[l];
+out:
+	t->DFLG = flg;
+	t->DLPT = i;
+	t->DRPT = o;
+	return(t);
+}
+
+static struct Tree *
+tree(void)
+{
+	if(treec == TRESIZ) {
+		prs("Command line overflow\n");
+		error++;
+		longjmp(jmp, 1);
+	}
+	return(&trebuf[treec++]);
 }
