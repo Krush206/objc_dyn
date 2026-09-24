@@ -152,6 +152,8 @@ static id
 execute1(id obj, const char *msg)
 {
 	int i;
+	SEL sel;
+	IMP imp;
 	void *arr[10];
 	struct Argument *argnew;
 
@@ -166,75 +168,47 @@ execute1(id obj, const char *msg)
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
 		arr[i++] = getObject(argnew->arg);
+	sel = sel_register_name(msg);
+	imp = objc_msg_lookup(obj, sel);
 	switch(i)
 	{
 	case 0:
-		return objc_msgSend(obj, sel_registerName(msg));
+		return imp(obj, sel);
 	case 1:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0]);
+		return imp(obj, sel, arr[0]);
 	case 2:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1]);
+		return imp(obj, sel, arr[0], arr[1]);
 	case 3:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2]);
+		return imp(obj, sel, arr[0], arr[1], arr[2]);
 	case 4:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3]);
 	case 5:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4]);
 	case 6:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4],
+								     arr[5]);
 	case 7:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4],
+								     arr[5],
+								     arr[6]);
 	case 8:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4],
+								     arr[5],
+								     arr[6],
+								     arr[7]);
 	case 9:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7],
-								arr[8]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4],
+								     arr[5],
+								     arr[6],
+								     arr[7],
+								     arr[8]);
 	case 10:
-		return objc_msgSend(obj, sel_registerName(msg), arr[0],
-								arr[1],
-								arr[2],
-								arr[3],
-								arr[4],
-								arr[5],
-								arr[6],
-								arr[7],
-								arr[8],
-								arr[9]);
+		return imp(obj, sel, arr[0], arr[1], arr[2], arr[3], arr[4],
+								     arr[5],
+								     arr[6],
+								     arr[7],
+								     arr[8],
+								     arr[9]);
 	}
 	return nil;
 }
@@ -341,7 +315,7 @@ main1(void)
 			register id obj;
 
 			obj = execute(args, argp - 1);
-			name = class_getName([obj class]);
+			name = class_get_class_name([obj class]);
 			(void) printf("%s <%p>\n", name, obj);
 		}
 	}
