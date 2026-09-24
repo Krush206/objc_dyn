@@ -3,15 +3,17 @@
 #import <stdlib.h>
 #import <string.h>
 #import <unistd.h>
-#import <objc/objc.h>
+#import <objc/objc-api.h>
 
+#define getc Getc
+#define putc Putc
 #define QUOTE 0200
 
 struct Class {
 	Class cls;
 	Class super;
 	Class root;
-	Class meta;
+	MetaClass meta;
 	const char *name;
 	struct Class *next;
 	struct Class *prev;
