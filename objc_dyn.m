@@ -66,8 +66,8 @@ loadRootClass(struct Root *rootnew, struct Class *clsnew)
 	roothead.next = &rootdef;
 	roothead.prev = rootnew;
 	roothead.cls = clsnew->root;
-	roothead.meta = object_getClass((id) clsnew->root);
-	roothead.name = class_getName(clsnew->root);
+	roothead.meta = class_get_meta_class(clsnew->root);
+	roothead.name = class_get_class_name(clsnew->root);
 	rootdef.prev = &roothead;
 	rootnew->next = &roothead;
 	loadRootClass(&roothead, clsnew->next);
@@ -76,26 +76,26 @@ loadRootClass(struct Root *rootnew, struct Class *clsnew)
 void
 loadClass(const char *rootname)
 {
-	unsigned int i;
-	Class *cls;
+	Class cls;
 	struct Class *clsnew;
 	struct Class *clshead;
+	void *init;
 	static int loaded;
 
 	if(loaded)
 		return;
-	cls = objc_copyClassList(&i);
 	clsnew = &clsdef;
 	clsnew->next = clsnew;
 	clsnew->prev = clsnew;
 	clshead = clsnew;
-	while(i--)
+	init = NULL;
+	while((cls = objc_next_class(&init)) != Nil)
 	{
 		clsnew = malloc(sizeof *clsnew);
-		clsnew->cls = cls[i];
-		clsnew->name = class_getName(clsnew->cls);
-		clsnew->super = class_getSuperclass(clsnew->cls);
-		clsnew->meta = object_getClass((id) clsnew->cls);
+		clsnew->cls = cls;
+		clsnew->name = class_get_class_name(clsnew->cls);
+		clsnew->super = class_get_super_class(clsnew->cls);
+		clsnew->meta = class_get_meta_class(clsnew->cls);
 		clsnew->root = getRootClass(clsnew->cls);
 		clsnew->next = &clsdef;
 		clsnew->prev = clshead;
@@ -123,7 +123,7 @@ getRootClass(Class cls)
 	do
 	{
 		clsnew = cls;
-		cls = class_getSuperclass(cls);
+		cls = class_get_super_class(cls);
 	}
 	while(cls != Nil);
 	return clsnew;
@@ -136,7 +136,7 @@ getClass(const char *clsname)
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
 		if(equal(clsname, clsnew->name) &&
-			 equal(clsroot, class_getName(clsnew->root)))
+			 equal(clsroot, class_get_class_name(clsnew->root)))
 			return clsnew->cls;
 	return Nil;
 }
@@ -179,21 +179,6 @@ setRootClass(const char *new)
 {
 	free(clsroot);
 	clsroot = strcpy(malloc(strlen(new) + 1), new);
-}
-
-void
-setClass(struct Class *clsnew)
-{
-	clsnew->cls = objc_allocateClassPair(clsnew->super, clsnew->name, 0);
-	if(clsnew->cls == Nil)
-		return;
-	objc_registerClassPair(clsnew->cls);
-	clsnew->meta = object_getClass((id) clsnew->cls);
-	clsnew->root = getRootClass(clsnew->cls);
-	clsnew->next = &clsdef;
-	clsnew->prev = clsdef.prev;
-	clsdef.prev->next = clsnew;
-	clsdef.prev = clsnew;
 }
 
 struct Object *
