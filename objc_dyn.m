@@ -139,7 +139,7 @@ getClass(const char *clsname)
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
 		if(equal(clsname, clsnew->name) &&
-			 equal(clsroot, class_get_class_name(clsnew->root)))
+		   equal(clsroot, class_get_class_name(clsnew->root)))
 			return clsnew->cls;
 	return Nil;
 }
