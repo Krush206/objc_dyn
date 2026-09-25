@@ -6,9 +6,8 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
-#import <fcntl.h>
-#import <sys/wait.h>
-#import <objc/objc-api.h>
+#import "/usr/local/include/objc/Object.h"
+#import "/usr/local/include/objc/objc-api.h"
 
 #define QUOTE 0200
 #define FAND 1
@@ -55,35 +54,35 @@
 #define DOLREPL 1
 #define DOLREPQ 2
 
-struct Class {
+struct ClassList {
 	Class cls;
 	Class super;
 	Class root;
 	MetaClass meta;
 	const char *name;
-	struct Class *next;
-	struct Class *prev;
+	struct ClassList *next;
+	struct ClassList *prev;
 };
 
-struct Root {
+struct RootList {
 	Class cls;
 	Class meta;
 	const char *name;
-	struct Root *next;
-	struct Root *prev;
+	struct RootList *next;
+	struct RootList *prev;
 };
 
-struct Object {
+struct ObjectList {
 	id obj;
 	char *name;
-	struct Object *next;
-	struct Object *prev;
+	struct ObjectList *next;
+	struct ObjectList *prev;
 };
 
-struct Argument {
+struct ArgumentList {
 	const char *arg;
-	struct Argument *next;
-	struct Argument *prev;
+	struct ArgumentList *next;
+	struct ArgumentList *prev;
 };
 
 struct Tree {
@@ -127,46 +126,53 @@ extern char *args[ARGSIZ];
 extern struct Tree trebuf[TRESIZ];
 extern jmp_buf jmp;
 
-extern void loadClass(const char *);
-extern void setClass(struct Class *);
-extern Class getClass(const char *);
-extern void setRootClass(const char *);
-extern id getObject(const char *);
-extern struct Object *getObjectList(void);
-extern struct Object *getObjectRecord(const char *);
-extern void freeArgument(struct Argument *);
-extern struct Argument *getArgumentList(void);
-extern struct Class *getClassRecord(const char *);
-
-@interface Shell
-+ (int) argc: (int) argc argv: (char *[]) argv;
-- (void) main;
-- (id) execute: (id) object message: (const char *) message;
+@interface Shell: Object
++ (int) argc: (int) c argv: (char *[]) av;
+- (id) execute: (id) obj message: (const char *) msg;
+- (void) execute: (char *) f tree: (struct Tree *) at;
 - (void) word;
-- (void) expand: (int) index value: (char *) value;
-- (void) execute: (struct Tree *) tree front: (int *) input back: (int *) output;
-- (struct Tree *) syntax: (char **) first end: (char **) last;
-- (struct Tree *) syn1: (char **) first end: (char **) last;
-- (struct Tree *) syn2: (char **) first end: (char **) last;
-- (struct Tree *) syn3: (char **) first end: (char **) last;
+- (void) expand: (int) i value: (char *) na;
+- (void) main;
+- (void) execute: (struct Tree *) t input: (int *) p1 output: (int *) p2;
+- (struct Tree *) syntax: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn1: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn2: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn3: (char **) p1 end: (char **) p2;
 - (struct Tree *) tree;
-- (void) wait: (int) process;
-- (void) execute: (char *) file tree: (struct Tree *) tree;
+- (void) wait: (int) i;
 @end
 
 @interface Shell (Miscellaneous)
 - (int) readCharacter;
+- (void) printString: (const char *) as;
+- (void) putCharacter: (int) c;
+- (void) printNumber: (int) n;
+- (int) anyCharacter: (int) c in: (const char *) as;
+- (int) equalString: (const char *) as1 to: (const char *) as2;
+- (void) error: (const char *) s code: (int) exitno;
+- (int) lastCharacter: (char *) cp;
 - (int) getCharacter: (int) flag;
-- (void) error: (const char *) message code: (int) status;
-- (void) printString: (const char *) string;
-- (void) putCharacter: (int) character;
-- (void) printNumber: (int) number;
-- (int) anyCharacter: (int) character in: (const char *) string;
-- (int) equalString: (const char *) first to: (const char *) second;
-- (int) lastCharacter: (char *) string;
-- (void) scan: (struct Tree *) tree selector: (SEL) sel;
-- (int) glob: (int) character;
-- (int) trim: (int) character;
-- (char *) integerToASCII: (int) number;
+- (void) scan: (struct Tree *) at selector: (SEL) sel;
+- (int) glob: (int) c;
+- (int) trim: (int) c;
+- (char *) integerToASCII: (int) n;
+@end
+
+@interface Shell (Runtime)
+- (void) allocRootClass: (struct RootList *) rootnew;
+- (void) forEachRootClass: (struct RootList *) rootnew;
+- (void) loadRootClass: (struct RootList *) rootnew
+	 class: (struct ClassList *) clsnew;
+- (void) loadClass: (const char *) rootname;
+- (Class) getRootClass: (Class) cls;
+- (Class) getClass: (const char *) clsname;
+- (id) getObject: (const char *) objname;
+- (struct ObjectList *) getObjectRecord: (const char *) objname;
+- (struct ClassList *) getClassRecord: (const char *) clsname;
+- (void) setRootClass: (const char *) new;
+- (struct ObjectList *) getObjectList;
+- (struct ArgumentList *) getArgumentList;
+- (void) freeArgument: (struct ArgumentList *) argnew;
+- (void) resolveLinks;
 @end
 #endif /* !OBJC_DYN */
