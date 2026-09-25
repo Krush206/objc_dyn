@@ -150,6 +150,44 @@ loop:
 	return nil;
 }
 
+- (char *) constructList: (char **) line
+{
+	struct ArgumentList *argument;
+	char **word;
+	char *selector;
+	char *cursor;
+	size_t length;
+
+	if(line[0] == NULL)
+		return NULL;
+	[self freeArgument: argdef->next];
+	if(line[1] == NULL)
+		return strcpy(malloc(strlen(line[0]) + 1), line[0]);
+	length = 0;
+	for(word = line; *word; word += 2) {
+		if(word[1] == NULL || [self lastCharacter: *word] != ':') {
+			[self error: ERR_BADMSG code: 255];
+			return NULL;
+		}
+		length += strlen(*word);
+	}
+	selector = malloc(length + 1);
+	cursor = selector;
+	for(word = line; *word; word += 2) {
+		length = strlen(*word);
+		(void) memcpy(cursor, *word, length);
+		cursor += length;
+		argument = malloc(sizeof *argument);
+		argument->arg = word[1];
+		argument->next = argdef;
+		argument->prev = argdef->prev;
+		argdef->prev->next = argument;
+		argdef->prev = argument;
+	}
+	*cursor = '\0';
+	return selector;
+}
+
 - (void) word
 {
 	register char c, c1;
@@ -291,6 +329,20 @@ null:
 	case TCOM:
 		cp1 = t->DARR[0];
 		cp2 = t->DARR[1];
+		if([self equalString: cp1 to: "@"]) {
+			char *message;
+
+			if(cp2 == NULL) {
+				[self error: ERR_BADMSG code: 255];
+				break;
+			}
+			message = [self constructList: &t->DARR[1]];
+			if(message != NULL) {
+				[self execute: self message: message];
+				free(message);
+			}
+			break;
+		}
 		if([self equalString: cp1 to: "="]) {
 			if(cp2 == NULL) {
 				[self error: ERR_EQUALS code: 255];
