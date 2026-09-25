@@ -196,7 +196,7 @@ getd:
 	t = at->DARR;
 	while((p = *t++))
 		while((c = *p))
-			*p++ = (*f)(c);
+			;
 }
 
 - (int) glob: (int) c

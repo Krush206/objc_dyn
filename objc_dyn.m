@@ -1,20 +1,7 @@
 #import "objc_dyn.h"
 
-static void allocRootClass(struct Root *);
-static void forEachRootClass(struct Root *);
-static void loadRootClass(struct Root *, struct Class *);
-static Class getRootClass(Class);
-static void resolveLinks(void);
-
-static struct Argument argdef;
-static struct Object objdef;
-static struct Class clsdef;
-static struct Root rootdef;
-
-static char *clsroot;
-
-static void
-allocRootClass(struct Root *rootnew)
+@implementation Shell (Runtime)
+- (void) allocRootClass: (struct Root *) rootnew
 {
 	struct Root *roothead;
 
@@ -38,8 +25,7 @@ allocRootClass(struct Root *rootnew)
 	}
 }
 
-static void
-forEachRootClass(struct Root *rootnew)
+- (void) forEachRootClass: (struct Root *) rootnew
 {
 	struct Root *roothead;
 
@@ -52,18 +38,17 @@ forEachRootClass(struct Root *rootnew)
 			rootnew->next->prev = rootnew->prev;
 			break;
 		}
-	forEachRootClass(rootnew->next);
+	[self forEachRootClass: rootnew->next];
 }
 
-static void
-loadRootClass(struct Root *rootnew, struct Class *clsnew)
+- (void) loadRootClass: (struct Root *) rootnew class: (struct Class *) clsnew
 {
 	struct Root roothead;
 
 	if(clsnew == &clsdef)
 	{
-		forEachRootClass(rootdef.next);
-		allocRootClass(rootdef.next);
+		[self forEachRootClass: rootdef.next];
+		[self allocRootClass: rootdef.next];
 		return;
 	}
 	roothead.next = &rootdef;
@@ -73,11 +58,10 @@ loadRootClass(struct Root *rootnew, struct Class *clsnew)
 	roothead.name = class_get_class_name(clsnew->root);
 	rootdef.prev = &roothead;
 	rootnew->next = &roothead;
-	loadRootClass(&roothead, clsnew->next);
+	[self loadRootClass: &roothead class: clsnew->next];
 }
 
-void
-loadClass(const char *rootname)
+- (void) loadClass: (const char *) rootname
 {
 	Class cls;
 	struct Class *clsnew;
@@ -92,7 +76,7 @@ loadClass(const char *rootname)
 	clsnew->prev = clsnew;
 	clshead = clsnew;
 	init = NULL;
-	resolveLinks();
+	[self resolveLinks];
 	while((cls = objc_next_class(&init)) != Nil)
 	{
 		clsnew = malloc(sizeof *clsnew);
@@ -100,7 +84,7 @@ loadClass(const char *rootname)
 		clsnew->name = class_get_class_name(clsnew->cls);
 		clsnew->super = class_get_super_class(clsnew->cls);
 		clsnew->meta = class_get_meta_class(clsnew->cls);
-		clsnew->root = getRootClass(clsnew->cls);
+		clsnew->root = [self getRootClass: clsnew->cls];
 		clsnew->next = &clsdef;
 		clsnew->prev = clshead;
 		clsdef.prev = clsnew;
@@ -113,13 +97,12 @@ loadClass(const char *rootname)
 	objdef.prev = &objdef;
 	rootdef.next = &rootdef;
 	rootdef.prev = &rootdef;
-	loadRootClass(&rootdef, clsdef.next);
-	setRootClass(rootname);
+	[self loadRootClass: &rootdef class: clsdef.next];
+	[self setRootClass: rootname];
 	loaded = 1;
 }
 
-static Class
-getRootClass(Class cls)
+- (Class) getRootClass: (Class) cls
 {
 	Class clsnew;
 
@@ -132,72 +115,64 @@ getRootClass(Class cls)
 	return clsnew;
 }
 
-Class
-getClass(const char *clsname)
+- (Class) getClass: (const char *) clsname
 {
 	struct Class *clsnew;
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
-		if(equal(clsname, clsnew->name) &&
-		   equal(clsroot, class_get_class_name(clsnew->root)))
+		if([self equal: clsname second: clsnew->name] &&
+		   [self equal: clsroot second: class_get_class_name(clsnew->root)])
 			return clsnew->cls;
 	return Nil;
 }
 
-id
-getObject(const char *objname)
+- (id) getObject: (const char *) objname
 {
 	struct Object *objnew;
 
 	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
-		if(equal(objname, objnew->name))
+		if([self equal: objname second: objnew->name])
 			return objnew->obj;
 	return nil;
 }
 
-struct Object *
-getObjectRecord(const char *objname)
+- (struct Object *) getObjectRecord: (const char *) objname
 {
 	struct Object *objnew;
 
 	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
-		if(equal(objname, objnew->name))
+		if([self equal: objname second: objnew->name])
 			return objnew;
 	return NULL;
 }
 
-struct Class *
-getClassRecord(const char *clsname)
+- (struct Class *) getClassRecord: (const char *) clsname
 {
 	struct Class *clsnew;
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
-		if(equal(clsname, clsnew->name))
+		if([self equal: clsname second: clsnew->name])
 			return clsnew;
 	return NULL;
 }
 
-void
-setRootClass(const char *new)
+- (void) setRootClass: (const char *) new
 {
 	free(clsroot);
 	clsroot = strcpy(malloc(strlen(new) + 1), new);
 }
 
-struct Object *
-getObjectList(void)
+- (struct Object *) getObjectList
 {
 	return &objdef;
 }
 
-struct Argument *
-getArgumentList(void)
+- (struct Argument *) getArgumentList
 {
 	return &argdef;
 }
 
-void
-freeArgument(struct Argument *argnew)
+- (void) freeArgument: (struct Argument *) argnew
 {
 	if(argnew == &argdef)
 	{
@@ -205,14 +180,14 @@ freeArgument(struct Argument *argnew)
 		argnew->prev = argnew;
 		return;
 	}
-	freeArgument(argnew->next);
+	[self freeArgument: argnew->next];
 	free(argnew);
 }
 
-static void
-resolveLinks(void)
+- (void) resolveLinks
 {
 	extern void __objc_resolve_class_links(void);
 
 	__objc_resolve_class_links();
 }
+@end
