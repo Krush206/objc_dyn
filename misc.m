@@ -105,7 +105,6 @@ equal(const char *as1, const char *as2)
 void
 err(const char *s, int exitno)
 {
-
 	prs(s);
 	prs("\n");
 	if(promp == NULL) {
