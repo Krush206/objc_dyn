@@ -35,8 +35,8 @@
 
 static char subchar = '$';
 
-int
-readc(void)
+@implementation Shell (Miscellaneous)
+- (int) readc
 {
 	int rdstat, c;
 	char cc;
@@ -48,18 +48,16 @@ readc(void)
 	return(c = cc);
 }
 
-void
-prs(const char *as)
+- (void) prs: (const char *) as
 {
 	register const char *s;
 
 	s = as;
 	while(*s)
-		putc(*s++);
+		[self putc: *s++];
 }
 
-void
-putc(int c)
+- (void) putc: (int) c
 {
 	char cc;
 
@@ -67,18 +65,16 @@ putc(int c)
 	write(2, &cc, (size_t) 1);
 }
 
-void
-prn(int n)
+- (void) prn: (int) n
 {
 	register int a;
 
 	if ((a = n/10))
-		prn(a);
-	putc(n%10 + '0');
+		[self prn: a];
+	[self putc: n%10 + '0'];
 }
 
-int
-any(int c, const char *as)
+- (int) any: (int) c in: (const char *) as
 {
 	register const char *s;
 
@@ -89,8 +85,7 @@ any(int c, const char *as)
 	return(0);
 }
 
-int
-equal(const char *as1, const char *as2)
+- (int) equal: (const char *) as1 second: (const char *) as2
 {
 	register const char *s1, *s2;
 
@@ -102,19 +97,17 @@ equal(const char *as1, const char *as2)
 	return(0);
 }
 
-void
-err(const char *s, int exitno)
+- (void) err: (const char *) s exit: (int) exitno
 {
-	prs(s);
-	prs("\n");
+	[self prs: s];
+	[self prs: "\n"];
 	if(promp == NULL) {
 		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
 }
 
-int
-lastchr(char *cp)
+- (int) lastchr: (char *) cp
 {
 	register int c;
 
@@ -128,8 +121,7 @@ lastchr(char *cp)
 
 /*	flag: !DOLREPL ==> no substitution, DOLREPL ==> substitute,
 	DOLREPQ ==> quoted substitution: "$1" = value of $1 for sure */
-int
-getc(int flag)
+- (int) getc: (int) flag
 {
 	register char c;
 
@@ -140,17 +132,17 @@ getc(int flag)
 	}
 	if(argp > eargp) {
 		argp -= 10;
-		while((c=getc(!DOLREPL)) != '\n');
+		while((c=[self getc: !DOLREPL]) != '\n');
 		argp += 10;
-		err(ERR_ARGS, 255);
+		[self err: ERR_ARGS exit: 255];
 		gflg++;
 		return(c);
 	}
 	if(linep > elinep) {
 		linep -= 10;
-		while((c=getc(!DOLREPL)) != '\n');
+		while((c=[self getc: !DOLREPL]) != '\n');
 		linep += 10;
-		err(ERR_CHAR, 255);
+		[self err: ERR_CHAR exit: 255];
 		gflg++;
 		return(c);
 	}
@@ -167,9 +159,9 @@ getd:
 		}
 		dolp = 0;
 	}
-	c = readc();
+	c = [self readc];
 	if(c == subchar && flag) {
-		c = readc();
+		c = [self readc];
 		if(c>='0' && c<='9') {
 			if(c-'0' < dolc)
 				dolp = dolv[c-'0'];
@@ -192,13 +184,12 @@ getd:
 			goto getd;
 		}
 		else
-			if(c != '\n')  c = readc();
+			if(c != '\n')  c = [self readc];
 	}
 	return(c&0177);
 }
 
-void
-scan(struct Tree *at, int (*f)(int))
+- (void) scan: (struct Tree *) at function: (int (*)(int)) f
 {
 	register char *p, **t, c;
 
@@ -208,22 +199,19 @@ scan(struct Tree *at, int (*f)(int))
 			*p++ = (*f)(c);
 }
 
-int
-tglob(int c)
+- (int) tglob: (int) c
 {
-	if(any(c, "[?*"))
+	if([self any: c in: "[?*"])
 		gflg = 1;
 	return(c);
 }
 
-int
-trim(int c)
+- (int) trim: (int) c
 {
 	return(c&0177);
 }
 
-char *
-itoa(int n)
+- (char *) itoa: (int) n
 {
 	register int i, j;
 	register char *cp;
@@ -240,3 +228,4 @@ itoa(int n)
 	}
 	return NULL;
 }
+@end
