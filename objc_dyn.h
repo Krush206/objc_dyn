@@ -129,11 +129,12 @@ extern jmp_buf jmp;
 @interface Shell: Object
 + (int) argc: (int) c argv: (char *[]) av;
 - (id) execute: (id) obj message: (const char *) msg;
+- (char *) constructList: (char **) line;
 - (void) execute: (char *) f tree: (struct Tree *) at;
 - (void) word;
 - (void) expand: (int) i value: (char *) na;
 - (void) main;
-- (void) execute: (struct Tree *) t input: (int *) p1 output: (int *) p2;
+- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
 - (struct Tree *) syntax: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn1: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn2: (char **) p1 end: (char **) p2;
