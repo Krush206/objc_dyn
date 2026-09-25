@@ -6,10 +6,9 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
+#import <fcntl.h>
+#import <sys/wait.h>
 #import <objc/objc-api.h>
-
-#define getc Getc
-#define putc Putc
 
 #define QUOTE 0200
 #define FAND 1
@@ -88,24 +87,24 @@ struct Argument {
 };
 
 struct Tree {
-  int t_dtyp;
-  int t_dflg;
-  union {
-    struct Tree *t_dltr;
-    char *t_dlpt;
-  } t_dlef;
-  union {
-    struct Tree *t_drtr;
-    char *t_drpt;
-  } t_drit;
-  union {
-    char *t_dptr;
-    struct Tree *t_dtre;
-  } t_dspr;
-  union {
-    char *t_dptr;
-    char *t_darr[ARGSIZ];
-  } t_dcom;
+	int t_dtyp;
+	int t_dflg;
+	union {
+		struct Tree *t_dltr;
+		char *t_dlpt;
+	} t_dlef;
+	union {
+		struct Tree *t_drtr;
+		char *t_drpt;
+	} t_drit;
+	union {
+		char *t_dptr;
+		struct Tree *t_dtre;
+	} t_dspr;
+	union {
+		char *t_dptr;
+		char *t_darr[ARGSIZ];
+	} t_dcom;
 };
 
 extern char *promp;
@@ -118,10 +117,15 @@ extern int gflg;
 extern int error;
 extern int dolc;
 extern int idolp;
-extern char pidp[];
+extern char pidp[NUMSIZ];
 extern char *dolp;
 extern char **dolv;
 extern char seta[][EXPSIZ];
+extern int treec;
+extern char line[LINSIZ];
+extern char *args[ARGSIZ];
+extern struct Tree trebuf[TRESIZ];
+extern jmp_buf jmp;
 
 extern void loadClass(const char *);
 extern void setClass(struct Class *);
@@ -130,21 +134,39 @@ extern void setRootClass(const char *);
 extern id getObject(const char *);
 extern struct Object *getObjectList(void);
 extern struct Object *getObjectRecord(const char *);
-extern int getc(int);
-extern int readc(void);
-extern void prs(const char *);
-extern void putc(int);
-extern void prn(int);
-extern int any(int, const char *);
-extern int equal(const char *, const char *);
-extern void err(const char *, int);
-extern int lastchr(char *);
 extern void freeArgument(struct Argument *);
 extern struct Argument *getArgumentList(void);
 extern struct Class *getClassRecord(const char *);
-extern int trim(int);
-extern int tglob(int);
-extern void scan(struct Tree *, int (*)(int));
-extern int length(char *);
-extern char *itoa(int);
+
+@interface Shell
++ (int) argc: (int) argc argv: (char *[]) argv;
+- (void) main;
+- (id) execute: (id) object message: (const char *) message;
+- (void) word;
+- (void) expand: (int) index value: (char *) value;
+- (void) execute: (struct Tree *) tree front: (int *) input back: (int *) output;
+- (struct Tree *) syntax: (char **) first end: (char **) last;
+- (struct Tree *) syn1: (char **) first end: (char **) last;
+- (struct Tree *) syn2: (char **) first end: (char **) last;
+- (struct Tree *) syn3: (char **) first end: (char **) last;
+- (struct Tree *) tree;
+- (void) wait: (int) process;
+- (void) execute: (char *) file tree: (struct Tree *) tree;
+@end
+
+@interface Shell (Miscellaneous)
+- (int) readCharacter;
+- (int) getCharacter: (int) flag;
+- (void) error: (const char *) message code: (int) status;
+- (void) printString: (const char *) string;
+- (void) putCharacter: (int) character;
+- (void) printNumber: (int) number;
+- (int) anyCharacter: (int) character in: (const char *) string;
+- (int) equalString: (const char *) first to: (const char *) second;
+- (int) lastCharacter: (char *) string;
+- (void) scan: (struct Tree *) tree selector: (SEL) sel;
+- (int) glob: (int) character;
+- (int) trim: (int) character;
+- (char *) integerToASCII: (int) number;
+@end
 #endif /* !OBJC_DYN */
