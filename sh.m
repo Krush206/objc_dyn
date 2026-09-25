@@ -33,7 +33,7 @@
 
 #import "objc_dyn.h"
 
-static void texec(struct Tree *);
+static void texec(char *, struct Tree *);
 static void main1(void);
 static void word(void);
 static void execute(struct Tree *, int *, int *);
@@ -248,7 +248,7 @@ rdval(int i, char *na)
 
 	st = seta[i];
 	np = na;
-	if(np == 0)
+	if(np == NULL)
 		goto null;
 	for (;;) {
 		c = *np++ & 0177;
@@ -297,16 +297,15 @@ execute(struct Tree *t, int *pf1, int *pf2)
 	register struct Tree *t1;
 	register char *cp1, *cp2;
 
-	if(t == 0)
+	if(t == NULL)
 		return;
 	switch(t->DTYP) {
-		int p;
 
 	case TCOM:
 		cp1 = t->DARR[0];
 		cp2 = t->DARR[1];
 		if(equal(cp1, "=")) {
-			if(cp2 == 0) {
+			if(cp2 == NULL) {
 				err(ERR_EQUALS, 255);
 				break;
 			}
@@ -442,14 +441,15 @@ f1:
 		gflg = 0;
 		scan(t, tglob);
 		if(gflg) {
-			t->DSPT = "/etc/glob";
-			execv(t->DSPT, &t->DSPT);
+			t->DARR[0] = "/etc/glob";
+			t->DARR[1] = NULL;
+			execv(t->DARR[0], t->DARR);
 			prs("glob: cannot execute\n");
 			exit(255);
 		}
 		scan(t, trim);
 		*linep = 0;
-		texec(t);
+		texec(t->DARR[0], t);
 		prs(t->DARR[0]);
 		err(ERR_FOUND, 255);
 		exit(255);
@@ -701,70 +701,105 @@ pwait(int i)
 		if(p == -1)
 			break;
 		e = s&0177;
-		if(e>=NSIG) {
-			if(p != i) {
-				prn(p);
-				prs(": ");
+		if(e) {
+			if(e>=NSIG) {
+				if(p != i) {
+					prn(p);
+					prs(": ");
+				}
+				prs("Signal ");
+				prn(e);
+				if(s&0200)
+					prs(" -- Core dumped");
 			}
-			prs("Signal ");
-			prn(e);
-			if(s&0200)
-				prs(" -- Core dumped");
-		}
-		else
-			prs(strsignal(e));
-		if(e)
+			else
+				prs(strsignal(e));
 			err("", (s>>8)|e);
+		}
 	}
 }
 
 static void
-texec(struct Tree *at)
+texec(char *f, struct Tree *at)
 {
+	register char *path;
 	register char *cp;
 	register char *sp;
-	register const char *path;
 	char cmd[CMDSIZ];
+	int txe2big;
+	int txeacces;
+	int txtbsy;
 
-	if(at->DARR[0] == NULL || at->DARR[0][0] == '\0')
-		return;
-	if(strchr(at->DARR[0], '/') != NULL) {
-		execv(at->DARR[0], at->DARR);
-		return;
-	}
 	path = getenv("PATH");
 	if(path == NULL)
 		path = "/bin:/usr/bin";
-	for(;;) {
+	txeacces = txe2big = txtbsy = 0;
+	if(any('/', f))
+		path = "";
+	do {
 		cp = cmd;
-		while(*path != '\0' && *path != ':') {
-			if(cp == &cmd[CMDSIZ-2]) {
-				errno = ENAMETOOLONG;
-				return;
-			}
+		while(*path != ':' && *path != '\0') {
+			if(cp >= &cmd[CMDSIZ-1])
+				goto toolong;
 			*cp++ = *path++;
 		}
-		if(cp == cmd)
-			*cp++ = '.';
-		*cp++ = '/';
-		for(sp = at->DARR[0]; *sp; sp++) {
-			if(cp == &cmd[CMDSIZ-1]) {
-				errno = ENAMETOOLONG;
-				return;
-			}
+		if(cp != cmd) {
+			if(cp >= &cmd[CMDSIZ-1])
+				goto toolong;
+			*cp++ = '/';
+		}
+		for(sp = f; *sp; sp++) {
+			if(cp >= &cmd[CMDSIZ-1])
+				goto toolong;
 			*cp++ = *sp;
 		}
 		*cp = '\0';
+		if(*path != '\0')
+			path++;
+		else
+			path = NULL;
+retry:
 		execv(cmd, at->DARR);
-		if(errno == ENOEXEC) {
-			at->DPTR = cmd;
-			at->DSPT = "/bin/osh";
-			execv(at->DSPT, &at->DSPT);
+		switch(errno) {
+		case ENOEXEC:
+			at->DARR[0] = "/bin/osh";
+			at->DARR[1] = NULL;
+			execv(at->DARR[0], at->DARR);
 			prs("No shell!\n");
 			exit(255);
+		case EACCES:
+			txeacces++;
+			break;
+		case ENOMEM:
+			prs(f);
+			err(ERR_LARGE, 255);
+			exit(255);
+		case E2BIG:
+			txe2big++;
+			break;
+		case ETXTBSY:
+			if((txtbsy += 10) > 60) {
+				prs(f);
+				err(": text busy", 255);
+				exit(255);
+			}
+			sleep(txtbsy);
+			goto retry;
 		}
-		if(*path == '\0')
-			return;
-		path++;
+	} while(path != NULL);
+	if(txe2big) {
+		prs(f);
+		err(": argument list too long", 255);
+		exit(255);
 	}
+	if(txeacces) {
+		prs(f);
+		err(": file not executable", 255);
+		exit(255);
+	}
+	return;
+toolong:
+	prs(f);
+	err(": path too long", 255);
+	exit(255);
 }
