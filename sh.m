@@ -33,6 +33,30 @@
 
 #import "objc_dyn.h"
 
+char *promp;
+char *linep;
+char *elinep;
+char **argp;
+char **eargp;
+int peekc;
+int gflg;
+int error;
+int dolc;
+int idolp;
+char pidp[NUMSIZ];
+char *dolp;
+char **dolv;
+char seta[26][EXPSIZ];
+int treec;
+char line[LINSIZ];
+char *args[ARGSIZ];
+struct Tree trebuf[TRESIZ];
+jmp_buf jmp;
+
+static struct Object *objdef;
+
+static struct Argument *argdef;
+
 int
 main(int c, char *av[])
 {
@@ -42,20 +66,22 @@ main(int c, char *av[])
 @implementation Shell
 + (int) argc: (int) c argv: (char *[]) av
 {
-	Shell *shell;
+	id shell;
 
+	loadClass("Object");
+	objdef = getObjectList();
+	argdef = getArgumentList();
 	shell = class_create_instance(self);
-	[shell loadClass: "Object"];
-	(void) strcpy(shell->pidp, [shell itoa: getpid()]);
-	shell->promp = "% ";
+	(void) strcpy(pidp, [shell integerToASCII: getpid()]);
+	promp = "% ";
 	if(getuid() == 0)
-		shell->promp = "# ";
+		promp = "# ";
 	if(!isatty(0))
-		shell->promp = NULL;
+		promp = NULL;
 loop:
-	if(shell->promp != NULL)
-		[shell prs: shell->promp];
-	shell->peekc = [shell getc: !DOLREPL];
+	if(promp != NULL)
+		[shell printString: promp];
+	peekc = [shell getCharacter: !DOLREPL];
 	[shell main];
 	goto loop;
 	return 0;
@@ -70,16 +96,16 @@ loop:
 	struct Argument *argnew;
 
 	i = 0;
-	for(argnew = argdef.next; argnew != &argdef; argnew = argnew->next)
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
 		i++;
 	if(i > 9)
 	{
-		[self err: "too many arguments" exit: 255];
+		[self error: "too many arguments" code: 255];
 		return nil;
 	}
 	i = 0;
-	for(argnew = argdef.next; argnew != &argdef; argnew = argnew->next)
-		arr[i++] = [self getObject: argnew->arg];
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
+		arr[i++] = getObject(argnew->arg);
 	sel = sel_register_name(msg);
 	imp = objc_msg_lookup(obj, sel);
 	switch(i)
@@ -133,7 +159,7 @@ loop:
 	*argp++ = linep;
 
 loop:
-	switch(c = [self getc: DOLREPL]) {
+	switch(c = [self getCharacter: DOLREPL]) {
 
 	case ' ':
 	case '\t':
@@ -143,14 +169,14 @@ loop:
 	case '"':	/* "..." : \", \$, $ substitution */
 		c1 = c;
 		dolflag = (c == '"' && !dolp) ? DOLREPQ : !DOLREPL;
-		while((c=[self getc: dolflag]) != c1) {
+		while((c=[self getCharacter: dolflag]) != c1) {
 			if(c == '\n') {
 				error++;
 				peekc = c;
 				return;
 			}
 			if (c1 == '"' && c == '\\' &&
-				((peekc = [self getc: !DOLREPL]) == '$' ||
+				((peekc = [self getCharacter: !DOLREPL]) == '$' ||
 				peekc == '"')) {
 					c = peekc;
 					peekc = 0;
@@ -162,7 +188,7 @@ loop:
 	case '&':
 	case '|':
 		*linep++ = c;
-		if((peekc=[self getc: DOLREPL]) == c)
+		if((peekc=[self getCharacter: DOLREPL]) == c)
 			peekc = 0;
 		else
 			linep--;
@@ -177,7 +203,7 @@ loop:
 		*linep++ = '\0';
 		return;
 	case '\\':
-		if ((c=[self getc: !DOLREPL])=='\n') goto loop;
+		if ((c=[self getCharacter: !DOLREPL])=='\n') goto loop;
 		else {
 			c |= QUOTE;
 			break;
@@ -188,16 +214,16 @@ loop:
 
 pack:
 	for(;;) {
-		if ((c = [self getc: DOLREPL])=='\\') {
-			if ((c=[self getc: !DOLREPL])=='\n') c = ' ';
+		if ((c = [self getCharacter: DOLREPL])=='\\') {
+			if ((c=[self getCharacter: !DOLREPL])=='\n') c = ' ';
 			else c |= QUOTE;
 		}
-		if([self any: c in: " '\"\t;&<>()|^\n:"]) {
+		if([self anyCharacter: c in: " '\"\t;&<>()|^\n:"]) {
 			peekc = c;
-			if([self any: c in: "\"'"])
+			if([self anyCharacter: c in: "\"'"])
 				goto loop;
 			if(c == ':')
-				*linep++ = [self getc: !DOLREPL];
+				*linep++ = [self getCharacter: !DOLREPL];
 			*linep++ = '\0';
 			return;
 		}
@@ -248,7 +274,7 @@ null:
 			t = [self syntax: args end: argp];
 		}
 		if(error != 0)
-			[self err: ERR_SYNTAX exit: 255]; else
+			[self error: ERR_SYNTAX code: 255]; else
 			[self execute: t front: 0 back: 0];
 	}
 }
@@ -266,34 +292,34 @@ null:
 	case TCOM:
 		cp1 = t->DARR[0];
 		cp2 = t->DARR[1];
-		if([self equal: cp1 second: "="]) {
+		if([self equalString: cp1 to: "="]) {
 			if(cp2 == NULL) {
-				[self err: ERR_EQUALS exit: 255];
+				[self error: ERR_EQUALS code: 255];
 				break;
 			}
 			i = *cp2 - 'a';
 			if(i>25 || i<0) {
-				[self err: ERR_EQUALS exit: 255];
+				[self error: ERR_EQUALS code: 255];
 				break;
 			}
 			[self expand: i value: t->DARR[2]];
 			break;
 		}
-		if([self equal: cp1 second: "chdir"]) {
+		if([self equalString: cp1 to: "chdir"]) {
 			if(t->DARR[1] != 0) {
 				if(chdir(t->DARR[1]) < 0) {
-					[self prs: cp1];
-					[self err: ERR_BADDIR exit: 255];
+					[self printString: cp1];
+					[self error: ERR_BADDIR code: 255];
 				}
 				break;
 			}
-			[self prs: cp1];
-			[self err: ERR_COUNT exit: 255];
+			[self printString: cp1];
+			[self error: ERR_COUNT code: 255];
 			break;
 		}
-		if([self equal: cp1 second: "shift"]) {
+		if([self equalString: cp1 to: "shift"]) {
 			if(dolc < 1) {
-				[self prs: "shift: no args\n"];
+				[self printString: "shift: no args\n"];
 				break;
 			}
 			dolv[1] = dolv[0];
@@ -301,25 +327,25 @@ null:
 			dolc--;
 			break;
 		}
-		if([self equal: cp1 second: "login"]) {
+		if([self equalString: cp1 to: "login"]) {
 			if(promp != 0) {
 				execv("/bin/login", t->DARR);
 			}
-			[self prs: "login: cannot execute\n"];
+			[self printString: "login: cannot execute\n"];
 			break;
 		}
-		if([self equal: cp1 second: "newgrp"]) {
+		if([self equalString: cp1 to: "newgrp"]) {
 			if(promp != 0) {
 				execv("/bin/newgrp", t->DARR);
 			}
-			[self prs: "newgrp: cannot execute\n"];
+			[self printString: "newgrp: cannot execute\n"];
 			break;
 		}
-		if([self equal: cp1 second: "wait"]) {
+		if([self equalString: cp1 to: "wait"]) {
 			[self wait: -1];
 			break;
 		}
-		if([self equal: cp1 second: ":"])
+		if([self equalString: cp1 to: ":"])
 			break;
 
 	case TPAR:
@@ -338,19 +364,19 @@ null:
 			}
 			if((f&FPRS) != 0) {
 				prn(i);
-				prs("\n");
+				[self printString: "\n"];
 			}
 			if((f&FAND) != 0)
 				break;
 			if((f&FPOU) == 0)
-				pwait(i);
+				[self wait: i];
 			break;
 		}
 		if(t->DLEF != 0) {
 			close(0);
 			i = open(t->DLPT, 0);
 			if(i < 0) {
-				prs(t->DLPT);
+				[self printString: t->DLPT];
 				err(ERR_OPEN, 255);
 				exit(255);
 			}
@@ -365,7 +391,7 @@ null:
 			}
 			i = creat(t->DRPT, 0666);
 			if(i < 0) {
-				prs(t->DRPT);
+				[self printString: t->DRPT];
 				err(ERR_CREATE, 255);
 				exit(255);
 			}
@@ -411,12 +437,12 @@ f1:
 			t->DARR[0] = "/etc/glob";
 			t->DARR[1] = NULL;
 			execv(t->DARR[0], t->DARR);
-			prs("glob: cannot execute\n");
+			[self printString: "glob: cannot execute\n"];
 			exit(255);
 		}
 		*linep = 0;
 		texec(t->DARR[0], t);
-		prs(t->DARR[0]);
+		[self printString: t->DARR[0]];
 		err(ERR_FOUND, 255);
 		exit(255);
 
@@ -644,7 +670,7 @@ out:
 - (struct Tree *) tree
 {
 	if(treec == TRESIZ) {
-		prs("Command line overflow\n");
+		[self printString: "Command line overflow\n"];
 		error++;
 		longjmp(jmp, 1);
 	}
@@ -665,15 +691,15 @@ out:
 			if(e>=NSIG) {
 				if(p != i) {
 					prn(p);
-					prs(": ");
+					[self printString: ": "];
 				}
-				prs("Signal ");
+				[self printString: "Signal "];
 				prn(e);
 				if(s&0200)
-					prs(" -- Core dumped");
+					[self printString: " -- Core dumped"];
 			}
 			else
-				prs(strsignal(e));
+				[self printString: strsignal(e)];
 			err("", (s>>8)|e);
 		}
 	}
@@ -724,13 +750,13 @@ retry:
 			at->DARR[0] = "/bin/osh";
 			at->DARR[1] = NULL;
 			execv(at->DARR[0], at->DARR);
-			prs("No shell!\n");
+			[self printString: "No shell!\n"];
 			exit(255);
 		case EACCES:
 			txeacces++;
 			break;
 		case ENOMEM:
-			prs(f);
+			[self printString: f];
 			err(ERR_LARGE, 255);
 			exit(255);
 		case E2BIG:
@@ -738,7 +764,7 @@ retry:
 			break;
 		case ETXTBSY:
 			if((txtbsy += 10) > 60) {
-				prs(f);
+				[self printString: f];
 				err(": text busy", 255);
 				exit(255);
 			}
@@ -747,18 +773,18 @@ retry:
 		}
 	} while(path != NULL);
 	if(txe2big) {
-		prs(f);
+		[self printString: f];
 		err(": argument list too long", 255);
 		exit(255);
 	}
 	if(txeacces) {
-		prs(f);
+		[self printString: f];
 		err(": file not executable", 255);
 		exit(255);
 	}
 	return;
 toolong:
-	prs(f);
+	[self printString: f];
 	err(": path too long", 255);
 	exit(255);
 }
