@@ -50,6 +50,7 @@
 #define ERR_LARGE ": too large"
 #define ERR_CHAR "Too many characters"
 #define ERR_ARGS "Too many args"
+#define ERR_BADMSG ": bad message"
 
 #define DOLREPL 1
 #define DOLREPQ 2
@@ -129,7 +130,7 @@ extern jmp_buf jmp;
 @interface Shell: Object
 + (int) argc: (int) c argv: (char *[]) av;
 - (id) execute: (id) obj message: (const char *) msg;
-- (char *) constructList: (char **) line;
+- (char *) buildArguments: (char **) line;
 - (void) execute: (char *) f tree: (struct Tree *) at;
 - (void) word;
 - (void) expand: (int) i value: (char *) na;
