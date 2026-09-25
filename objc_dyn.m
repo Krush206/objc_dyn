@@ -1,16 +1,23 @@
 #import "objc_dyn.h"
 
+static struct ArgumentList argdef;
+static struct ObjectList objdef;
+static struct ClassList clsdef;
+static struct RootList rootdef;
+
+static char *clsroot;
+
 @implementation Shell (Runtime)
-- (void) allocRootClass: (struct Root *) rootnew
+- (void) allocRootClass: (struct RootList *) rootnew
 {
-	struct Root *roothead;
+	struct RootList *roothead;
 
 	roothead = &rootdef;
 	rootdef.next = roothead;
 	rootdef.prev = roothead;
 	while(rootnew != &rootdef)
 	{
-		struct Root *alloc;
+		struct RootList *alloc;
 
 		alloc = malloc(sizeof *alloc);
 		alloc->next = &rootdef;
@@ -25,13 +32,15 @@
 	}
 }
 
-- (void) forEachRootClass: (struct Root *) rootnew
+- (void) forEachRootClass: (struct RootList *) rootnew
 {
-	struct Root *roothead;
+	struct RootList *roothead;
 
 	if(rootnew == &rootdef)
 		return;
-	for(roothead = rootnew->next; roothead != rootnew; roothead = roothead->next)
+	for(roothead = rootnew->next;
+	    roothead != rootnew;
+	    roothead = roothead->next)
 		if(roothead->cls == rootnew->cls)
 		{
 			rootnew->prev->next = rootnew->next;
@@ -41,9 +50,10 @@
 	[self forEachRootClass: rootnew->next];
 }
 
-- (void) loadRootClass: (struct Root *) rootnew class: (struct Class *) clsnew
+- (void) loadRootClass: (struct RootList *) rootnew
+	 class: (struct ClassList *) clsnew
 {
-	struct Root roothead;
+	struct RootList roothead;
 
 	if(clsnew == &clsdef)
 	{
@@ -64,8 +74,8 @@
 - (void) loadClass: (const char *) rootname
 {
 	Class cls;
-	struct Class *clsnew;
-	struct Class *clshead;
+	struct ClassList *clsnew;
+	struct ClassList *clshead;
 	void *init;
 	static int loaded;
 
@@ -117,41 +127,41 @@
 
 - (Class) getClass: (const char *) clsname
 {
-	struct Class *clsnew;
+	struct ClassList *clsnew;
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
-		if([self equal: clsname second: clsnew->name] &&
-		   [self equal: clsroot second: class_get_class_name(clsnew->root)])
+		if([self equalString: clsname to: clsnew->name] &&
+		   [self equalString: clsroot to: class_get_class_name(clsnew->root)])
 			return clsnew->cls;
 	return Nil;
 }
 
 - (id) getObject: (const char *) objname
 {
-	struct Object *objnew;
+	struct ObjectList *objnew;
 
 	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
-		if([self equal: objname second: objnew->name])
+		if([self equalString: objname to: objnew->name])
 			return objnew->obj;
 	return nil;
 }
 
-- (struct Object *) getObjectRecord: (const char *) objname
+- (struct ObjectList *) getObjectRecord: (const char *) objname
 {
-	struct Object *objnew;
+	struct ObjectList *objnew;
 
 	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
-		if([self equal: objname second: objnew->name])
+		if([self equalString: objname to: objnew->name])
 			return objnew;
 	return NULL;
 }
 
-- (struct Class *) getClassRecord: (const char *) clsname
+- (struct ClassList *) getClassRecord: (const char *) clsname
 {
-	struct Class *clsnew;
+	struct ClassList *clsnew;
 
 	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
-		if([self equal: clsname second: clsnew->name])
+		if([self equalString: clsname to: clsnew->name])
 			return clsnew;
 	return NULL;
 }
@@ -162,17 +172,17 @@
 	clsroot = strcpy(malloc(strlen(new) + 1), new);
 }
 
-- (struct Object *) getObjectList
+- (struct ObjectList *) getObjectList
 {
 	return &objdef;
 }
 
-- (struct Argument *) getArgumentList
+- (struct ArgumentList *) getArgumentList
 {
 	return &argdef;
 }
 
-- (void) freeArgument: (struct Argument *) argnew
+- (void) freeArgument: (struct ArgumentList *) argnew
 {
 	if(argnew == &argdef)
 	{
