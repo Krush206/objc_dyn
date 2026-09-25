@@ -33,6 +33,7 @@
 
 #import "objc_dyn.h"
 
+static void texec(struct Tree *);
 static void main1(void);
 static void word(void);
 static void execute(struct Tree *, int *, int *);
@@ -43,6 +44,7 @@ static struct Tree *syn1(char **, char **);
 static struct Tree *syn2(char **, char **);
 static struct Tree *syn3(char **, char **);
 static struct Tree *tree(void);
+static void pwait(int);
 
 char *promp;
 char *linep;
@@ -78,6 +80,7 @@ main(void)
 	loadClass("Object");
 	objdef = getObjectList();
 	argdef = getArgumentList();
+	(void) strcpy(pidp, itoa(getpid()));
 	promp = "% ";
 	if(getuid() == 0)
 		promp = "# ";
@@ -405,7 +408,7 @@ execute(struct Tree *t, int *pf1, int *pf2)
 				err(ERR_CREATE, 255);
 				exit(255);
 			}
-		f1:
+f1:
 			close(1);
 			dup(i);
 			close(i);
@@ -446,27 +449,7 @@ execute(struct Tree *t, int *pf1, int *pf2)
 		}
 		scan(t, trim);
 		*linep = 0;
-		texec(t->DPTR, t);
-		cp1 = linep;
-		cp2 = getenv("PATH");
-		p = 0;
-		while((*cp1 = *cp2++)) {
-			p++;
-			if(*cp1 == ':') {
-				*cp1++ = '/';
-				cp2 = t->DARR[0];
-				while((*cp1++ = *cp2++));
-				texec(linep, t);
-				cp1 = linep;
-				cp2 = &getenv("PATH")[p];
-				continue;
-			}
-			cp1++;
-		}
-		*cp1++ = '/';
-		cp2 = t->DARR[0];
-		while((*cp1++ = *cp2++));
-		texec(linep, t);
+		texec(t);
 		prs(t->DARR[0]);
 		err(ERR_FOUND, 255);
 		exit(255);
@@ -705,4 +688,83 @@ tree(void)
 		longjmp(jmp, 1);
 	}
 	return(&trebuf[treec++]);
+}
+
+static void
+pwait(int i)
+{
+	register int p, e;
+	int s;
+
+	for(;;) {
+		p = wait(&s);
+		if(p == -1)
+			break;
+		e = s&0177;
+		if(e>=NSIG) {
+			if(p != i) {
+				prn(p);
+				prs(": ");
+			}
+			prs("Signal ");
+			prn(e);
+			if(s&0200)
+				prs(" -- Core dumped");
+		}
+		else
+			prs(strsignal(e));
+		if(e)
+			err("", (s>>8)|e);
+	}
+}
+
+static void
+texec(struct Tree *at)
+{
+	register char *cp;
+	register char *sp;
+	register const char *path;
+	char cmd[CMDSIZ];
+
+	if(at->DARR[0] == NULL || at->DARR[0][0] == '\0')
+		return;
+	if(strchr(at->DARR[0], '/') != NULL) {
+		execv(at->DARR[0], at->DARR);
+		return;
+	}
+	path = getenv("PATH");
+	if(path == NULL)
+		path = "/bin:/usr/bin";
+	for(;;) {
+		cp = cmd;
+		while(*path != '\0' && *path != ':') {
+			if(cp == &cmd[CMDSIZ-2]) {
+				errno = ENAMETOOLONG;
+				return;
+			}
+			*cp++ = *path++;
+		}
+		if(cp == cmd)
+			*cp++ = '.';
+		*cp++ = '/';
+		for(sp = at->DARR[0]; *sp; sp++) {
+			if(cp == &cmd[CMDSIZ-1]) {
+				errno = ENAMETOOLONG;
+				return;
+			}
+			*cp++ = *sp;
+		}
+		*cp = '\0';
+		execv(cmd, at->DARR);
+		if(errno == ENOEXEC) {
+			at->DPTR = cmd;
+			at->DSPT = "/bin/osh";
+			execv(at->DSPT, &at->DSPT);
+			prs("No shell!\n");
+			exit(255);
+		}
+		if(*path == '\0')
+			return;
+		path++;
+	}
 }
