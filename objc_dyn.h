@@ -6,10 +6,9 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
+#import <fcntl.h>
+#import <sys/wait.h>
 #import <objc/objc-api.h>
-
-#define getc Getc
-#define putc Putc
 
 #define QUOTE 0200
 #define FAND 1
@@ -88,63 +87,96 @@ struct Argument {
 };
 
 struct Tree {
-  int t_dtyp;
-  int t_dflg;
-  union {
-    struct Tree *t_dltr;
-    char *t_dlpt;
-  } t_dlef;
-  union {
-    struct Tree *t_drtr;
-    char *t_drpt;
-  } t_drit;
-  union {
-    char *t_dptr;
-    struct Tree *t_dtre;
-  } t_dspr;
-  union {
-    char *t_dptr;
-    char *t_darr[ARGSIZ];
-  } t_dcom;
+	int t_dtyp;
+	int t_dflg;
+	union {
+		struct Tree *t_dltr;
+		char *t_dlpt;
+	} t_dlef;
+	union {
+		struct Tree *t_drtr;
+		char *t_drpt;
+	} t_drit;
+	union {
+		char *t_dptr;
+		struct Tree *t_dtre;
+	} t_dspr;
+	union {
+		char *t_dptr;
+		char *t_darr[ARGSIZ];
+	} t_dcom;
 };
 
-extern char *promp;
-extern char *linep;
-extern char *elinep;
-extern char **argp;
-extern char **eargp;
-extern int peekc;
-extern int gflg;
-extern int error;
-extern int dolc;
-extern int idolp;
-extern char pidp[];
-extern char *dolp;
-extern char **dolv;
-extern char seta[][EXPSIZ];
+@interface Shell
+{
+@public
+	char *promp;
+	char *linep;
+	char *elinep;
+	char **argp;
+	char **eargp;
+	int peekc;
+	int gflg;
+	int error;
+	int dolc;
+	int idolp;
+	char pidp[NUMSIZ];
+	char *dolp;
+	char **dolv;
+	char seta[26][EXPSIZ];
+	int treec;
+	char line[LINSIZ];
+	char *args[ARGSIZ];
+	struct Object objdef;
+	struct Argument argdef;
+	struct Class clsdef;
+	struct Root rootdef;
+	char *clsroot;
+	struct Tree trebuf[TRESIZ];
+	jmp_buf jmp;
+}
++ (int) argc: (int) argc argv: (char *[]) argv;
+- (void) main;
+- (id) execute: (id) object message: (const char *) message;
+- (void) word;
+- (void) expand: (int) index value: (char *) value;
+- (void) execute: (struct Tree *) tree front: (int *) input back: (int *) output;
+- (struct Tree *) syntax: (char **) first end: (char **) last;
+- (struct Tree *) syn1: (char **) first end: (char **) last;
+- (struct Tree *) syn2: (char **) first end: (char **) last;
+- (struct Tree *) syn3: (char **) first end: (char **) last;
+- (struct Tree *) tree;
+- (void) wait: (int) process;
+- (void) execute: (char *) file tree: (struct Tree *) tree;
+@end
 
-extern void loadClass(const char *);
-extern void setClass(struct Class *);
-extern Class getClass(const char *);
-extern void setRootClass(const char *);
-extern id getObject(const char *);
-extern struct Object *getObjectList(void);
-extern struct Object *getObjectRecord(const char *);
-extern int getc(int);
-extern int readc(void);
-extern void prs(const char *);
-extern void putc(int);
-extern void prn(int);
-extern int any(int, const char *);
-extern int equal(const char *, const char *);
-extern void err(const char *, int);
-extern int lastchr(char *);
-extern void freeArgument(struct Argument *);
-extern struct Argument *getArgumentList(void);
-extern struct Class *getClassRecord(const char *);
-extern int trim(int);
-extern int tglob(int);
-extern void scan(struct Tree *, int (*)(int));
-extern int length(char *);
-extern char *itoa(int);
+@interface Shell (Runtime)
+- (Class) getRootClass: (Class) cls;
+- (void) loadClass: (const char *) rootname;
+- (Class) getClass: (const char *) name;
+- (void) setRootClass: (const char *) name;
+- (id) getObject: (const char *) name;
+- (struct Object *) getObjectList;
+- (struct Object *) getObjectRecord: (const char *) name;
+- (struct Class *) getClassRecord: (const char *) name;
+- (void) freeArgument: (struct Argument *) argument;
+- (struct Argument *) getArgumentList;
+- (void) resolveLinks;
+@end
+
+@interface Shell (Miscellaneous)
+- (int) readc;
+- (int) getc: (int) flag;
+- (void) err: (const char *) message exit: (int) status;
+- (void) prs: (const char *) string;
+- (void) putc: (int) character;
+- (void) prn: (int) number;
+- (int) any: (int) character in: (const char *) string;
+- (int) equal: (const char *) first second: (const char *) second;
+- (int) lastchr: (char *) string;
+- (void) scan: (struct Tree *) tree function: (int (*)(int)) function;
+- (int) tglob: (int) character;
+- (int) trim: (int) character;
+- (char *) itoa: (int) number;
+@end
 #endif /* !OBJC_DYN */
