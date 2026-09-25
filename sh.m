@@ -53,9 +53,8 @@ char *args[ARGSIZ];
 struct Tree trebuf[TRESIZ];
 jmp_buf jmp;
 
-static struct Object *objdef;
-
-static struct Argument *argdef;
+static struct ObjectList *objdef;
+static struct ArgumentList *argdef;
 
 int
 main(int c, char *av[])
@@ -68,10 +67,10 @@ main(int c, char *av[])
 {
 	id shell;
 
-	loadClass("Object");
-	objdef = getObjectList();
-	argdef = getArgumentList();
 	shell = class_create_instance(self);
+	[shell loadClass: "Object"];
+	objdef = [shell getObjectList];
+	argdef = [shell getArgumentList];
 	(void) strcpy(pidp, [shell integerToASCII: getpid()]);
 	promp = "% ";
 	if(getuid() == 0)
@@ -93,7 +92,7 @@ loop:
 	SEL sel;
 	IMP imp;
 	void *arr[10];
-	struct Argument *argnew;
+	struct ArgumentList *argnew;
 
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
@@ -105,7 +104,7 @@ loop:
 	}
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
-		arr[i++] = getObject(argnew->arg);
+		arr[i++] = [self getObject: argnew->arg];
 	sel = sel_register_name(msg);
 	imp = objc_msg_lookup(obj, sel);
 	switch(i)
@@ -275,11 +274,11 @@ null:
 		}
 		if(error != 0)
 			[self error: ERR_SYNTAX code: 255]; else
-			[self execute: t front: 0 back: 0];
+			[self execute: t input: NULL output: NULL];
 	}
 }
 
-- (void) execute: (struct Tree *) t front: (int *) p1 back: (int *) p2
+- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
 {
 	int i, f, pv[2];
 	register struct Tree *t1;
@@ -359,11 +358,11 @@ null:
 		}
 		if(i != 0) {
 			if((f&FPIN) != 0) {
-				close(p1[0]);
-				close(p1[1]);
+				close(pf1[0]);
+				close(pf1[1]);
 			}
 			if((f&FPRS) != 0) {
-				prn(i);
+				[self printNumber: i];
 				[self printString: "\n"];
 			}
 			if((f&FAND) != 0)
@@ -402,15 +401,15 @@ f1:
 		}
 		if((f&FPIN) != 0) {
 			close(0);
-			dup(p1[0]);
-			close(p1[0]);
-			close(p1[1]);
+			dup(pf1[0]);
+			close(pf1[0]);
+			close(pf1[1]);
 		}
 		if((f&FPOU) != 0) {
 			close(1);
-			dup(p2[1]);
-			close(p2[0]);
-			close(p2[1]);
+			dup(pf2[1]);
+			close(pf2[0]);
+			close(pf2[1]);
 		}
 		if((f&FINT)!=0 && t->DLEF==0 && (f&FPIN)==0) {
 			close(0);
@@ -423,13 +422,13 @@ f1:
 		if(t->DTYP == TPAR) {
 			if((t1 = t->DSTR))
 				t1->DFLG |= f&FINT;
-			execute(t1, p1, p2);
+			[self execute: t input: pf1 output: pf2];
 			exit(255);
 		}
 		gflg = 0;
 		for(i = 0; (cp1 = t->DARR[i]) != NULL; i++)
 			for(cp2 = cp1; *cp2; cp2++) {
-				if(any(*cp2, "[?*"))
+				if([self anyCharacter: *cp2 in: "[?*"])
 					gflg = 1;
 				*cp2 &= 0177;
 			}
@@ -441,7 +440,7 @@ f1:
 			exit(255);
 		}
 		*linep = 0;
-		texec(t->DARR[0], t);
+		[self execute: t->DARR[0] tree: t];
 		[self printString: t->DARR[0]];
 		err(ERR_FOUND, 255);
 		exit(255);
@@ -451,20 +450,20 @@ f1:
 		pipe(pv);
 		t1 = t->DLEF;
 		t1->DFLG |= FPOU | (f&(FPIN|FINT|FPRS));
-		execute(t1, p1, pv);
+		[self execute: t1 input: pf1 output: pv];
 		t1 = t->DRIT;
 		t1->DFLG |= FPIN | (f&(FPOU|FINT|FAND|FPRS));
-		execute(t1, pv, p2);
+		[self execute: t1 input: pv output: pf2];
 		break;
 
 	case TLST:
 		f = t->DFLG&FINT;
 		if((t1 = t->DLEF))
 			t1->DFLG |= f;
-		execute(t1, p1, p2);
+		[self execute: t1 input: pf1 output: pf2];
 		if((t1 = t->DRIT))
 			t1->DFLG |= f;
-		execute(t1, p1, p2);
+		[self execute: t1 input: pf1 output: pf2];
 	}
 }
 
@@ -477,7 +476,7 @@ f1:
 - (struct Tree *) syntax: (char **) p1 end: (char **) p2
 {
 	while(p1 != p2) {
-		if(any(**p1, ";&\n"))
+		if([self anyCharacter: **p1 in: ";&\n"])
 			p1++; else
 			return [self syn1: p1 end: p2];
 	}
@@ -627,7 +626,7 @@ f1:
 				error++;
 				p--;
 			}
-			if(any(**p, "<>("))
+			if([self anyCharacter: **p in: "<>("])
 				error++;
 			if(c == '<') {
 				if(i != 0)
@@ -690,11 +689,11 @@ out:
 		if(e) {
 			if(e>=NSIG) {
 				if(p != i) {
-					prn(p);
+					[self printNumber: p];
 					[self printString: ": "];
 				}
 				[self printString: "Signal "];
-				prn(e);
+				[self printNumber: e];
 				if(s&0200)
 					[self printString: " -- Core dumped"];
 			}
@@ -719,7 +718,7 @@ out:
 	if(path == NULL)
 		path = "/bin:/usr/bin";
 	txeacces = txe2big = txtbsy = 0;
-	if(any('/', f))
+	if([self anyCharacter: '/' in: f])
 		path = "";
 	do {
 		cp = cmd;
