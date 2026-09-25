@@ -36,7 +36,7 @@
 static char subchar = '$';
 
 @implementation Shell (Miscellaneous)
-- (int) readc
+- (int) readCharacter
 {
 	int rdstat, c;
 	char cc;
@@ -48,16 +48,16 @@ static char subchar = '$';
 	return(c = cc);
 }
 
-- (void) prs: (const char *) as
+- (void) printString: (const char *) as
 {
 	register const char *s;
 
 	s = as;
 	while(*s)
-		[self putc: *s++];
+		[self putCharacter: *s++];
 }
 
-- (void) putc: (int) c
+- (void) putCharacter: (int) c
 {
 	char cc;
 
@@ -65,16 +65,16 @@ static char subchar = '$';
 	write(2, &cc, (size_t) 1);
 }
 
-- (void) prn: (int) n
+- (void) printNumber: (int) n
 {
 	register int a;
 
 	if ((a = n/10))
-		[self prn: a];
-	[self putc: n%10 + '0'];
+		[self printNumber: a];
+	[self putCharacter: n%10 + '0'];
 }
 
-- (int) any: (int) c in: (const char *) as
+- (int) anyCharacter: (int) c in: (const char *) as
 {
 	register const char *s;
 
@@ -85,7 +85,7 @@ static char subchar = '$';
 	return(0);
 }
 
-- (int) equal: (const char *) as1 second: (const char *) as2
+- (int) equalString: (const char *) as1 to: (const char *) as2
 {
 	register const char *s1, *s2;
 
@@ -97,17 +97,17 @@ static char subchar = '$';
 	return(0);
 }
 
-- (void) err: (const char *) s exit: (int) exitno
+- (void) error: (const char *) s code: (int) exitno
 {
-	[self prs: s];
-	[self prs: "\n"];
+	[self printString: s];
+	[self printString: "\n"];
 	if(promp == NULL) {
 		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
 }
 
-- (int) lastchr: (char *) cp
+- (int) lastCharacter: (char *) cp
 {
 	register int c;
 
@@ -121,7 +121,7 @@ static char subchar = '$';
 
 /*	flag: !DOLREPL ==> no substitution, DOLREPL ==> substitute,
 	DOLREPQ ==> quoted substitution: "$1" = value of $1 for sure */
-- (int) getc: (int) flag
+- (int) getCharacter: (int) flag
 {
 	register char c;
 
@@ -132,17 +132,17 @@ static char subchar = '$';
 	}
 	if(argp > eargp) {
 		argp -= 10;
-		while((c=[self getc: !DOLREPL]) != '\n');
+		while((c=[self getCharacter: !DOLREPL]) != '\n');
 		argp += 10;
-		[self err: ERR_ARGS exit: 255];
+		[self error: ERR_ARGS code: 255];
 		gflg++;
 		return(c);
 	}
 	if(linep > elinep) {
 		linep -= 10;
-		while((c=[self getc: !DOLREPL]) != '\n');
+		while((c=[self getCharacter: !DOLREPL]) != '\n');
 		linep += 10;
-		[self err: ERR_CHAR exit: 255];
+		[self error: ERR_CHAR code: 255];
 		gflg++;
 		return(c);
 	}
@@ -159,9 +159,9 @@ getd:
 		}
 		dolp = 0;
 	}
-	c = [self readc];
+	c = [self readCharacter];
 	if(c == subchar && flag) {
-		c = [self readc];
+		c = [self readCharacter];
 		if(c>='0' && c<='9') {
 			if(c-'0' < dolc)
 				dolp = dolv[c-'0'];
@@ -184,12 +184,12 @@ getd:
 			goto getd;
 		}
 		else
-			if(c != '\n')  c = [self readc];
+			if(c != '\n')  c = [self readCharacter];
 	}
 	return(c&0177);
 }
 
-- (void) scan: (struct Tree *) at function: (int (*)(int)) f
+- (void) scan: (struct Tree *) at selector: (SEL) sel
 {
 	register char *p, **t, c;
 
@@ -199,9 +199,9 @@ getd:
 			*p++ = (*f)(c);
 }
 
-- (int) tglob: (int) c
+- (int) glob: (int) c
 {
-	if([self any: c in: "[?*"])
+	if([self anyCharacter: c in: "[?*"])
 		gflg = 1;
 	return(c);
 }
@@ -211,7 +211,7 @@ getd:
 	return(c&0177);
 }
 
-- (char *) itoa: (int) n
+- (char *) integerToASCII: (int) n
 {
 	register int i, j;
 	register char *cp;
