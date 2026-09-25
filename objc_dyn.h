@@ -5,6 +5,7 @@
 #import <unistd.h>
 #import <signal.h>
 #import <setjmp.h>
+#import <errno.h>
 #import <objc/objc-api.h>
 
 #define getc Getc
@@ -38,6 +39,7 @@
 #define EXPSIZ 1000
 #define TRESIZ 100
 #define NUMSIZ 12
+#define CMDSIZ 100
 
 #define ERR_SYNTAX "syntax error"
 #define ERR_EQUALS "'=' error"
@@ -144,4 +146,5 @@ extern int trim(int);
 extern int tglob(int);
 extern void scan(struct Tree *, int (*)(int));
 extern int length(char *);
+extern char *itoa(int);
 #endif /* !OBJC_DYN */
