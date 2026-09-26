@@ -1,5 +1,7 @@
 #import "objc_dyn.h"
 
+static char subchar = '$';
+
 @implementation Shell (Lexer)
 - (void) word
 {
