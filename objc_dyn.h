@@ -6,6 +6,7 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
+#import <sys/wait.h>
 #import "/usr/local/include/objc/Object.h"
 #import "/usr/local/include/objc/objc-api.h"
 
@@ -117,14 +118,18 @@ extern int gflg;
 extern int error;
 extern int dolc;
 extern int idolp;
-extern char pidp[NUMSIZ];
+extern char (*pidp)[NUMSIZ];
 extern char *dolp;
 extern char **dolv;
-extern char seta[][EXPSIZ];
+extern char (*seta)[][EXPSIZ];
 extern int treec;
-extern char line[LINSIZ];
-extern char *args[ARGSIZ];
-extern struct Tree trebuf[TRESIZ];
+extern int onelflg;
+extern int errval;
+extern int execflg;
+extern char *arginp;
+extern char (*line)[LINSIZ];
+extern char *(*args)[ARGSIZ];
+extern struct Tree (*trebuf)[TRESIZ];
 extern jmp_buf jmp;
 
 @interface Shell: Object
