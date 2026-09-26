@@ -33,8 +33,6 @@
 
 #import "objc_dyn.h"
 
-static char subchar = '$';
-
 @implementation Shell (Miscellaneous)
 - (void) printString: (const char *) as
 {
