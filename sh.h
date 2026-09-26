@@ -62,6 +62,16 @@
 #define DOLREPL 1
 #define DOLREPQ 2
 
+struct Builtin {
+	const char *bname;
+	SEL bfunc;
+};
+
+struct Pack {
+	struct Builtin *ptr;
+	size_t count;
+};
+
 struct Argument {
 	const char *arg;
 	struct Argument *next;
@@ -115,6 +125,7 @@ extern struct Argument *argdef;
 @interface Shell: Object
 {
 @private
+	id func;
 	char msg[MSGSIZ];
 	char seta[26][EXPSIZ];
 	char line[LINSIZ];
@@ -123,7 +134,7 @@ extern struct Argument *argdef;
 	struct Tree trebuf[TRESIZ];
 	struct Argument argbuf[LSTSIZ];
 }
-+ (int) argc: (int) c argv: (char *[]) av;
++ (int) argumentCount: (int) c argumentVector: (char *[]) av;
 - (void) main;
 @end
 
@@ -182,5 +193,29 @@ extern struct Argument *argdef;
 - (void) setMessage: (char *) ptr;
 - (char (*)[]) getSetASCII;
 - (void) setSetASCII: (char (*)[]) ptr;
+- (id) getFunction;
+- (void) setFunction: (id) ptr;
+@end
+
+@interface Function: Object
+{
+@private
+	id sh;
+	struct Pack pack;
+}
++ (id) new;
+- (int) scan: (struct Tree *) t;
+- (void) dozip: (struct Tree *) t;
+- (void) doset: (struct Tree *) t;
+- (void) doobj: (struct Tree *) t;
+- (void) dochdir: (struct Tree *) t;
+- (void) dologin: (struct Tree *) t;
+- (void) donewgrp: (struct Tree *) t;
+- (void) doshift: (struct Tree *) t;
+- (void) dowait: (struct Tree *) t;
+- (struct Pack *) getPack;
+- (void) setPack: (struct Pack *) ptr;
+- (id) getShell;
+- (void) setShell: (id) ptr;
 @end
 #endif /* !SH_H */
