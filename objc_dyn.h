@@ -134,23 +134,39 @@ extern jmp_buf jmp;
 
 @interface Shell: Object
 + (int) argc: (int) c argv: (char *[]) av;
+- (void) main;
+@end
+
+@interface Shell (Semantic)
+- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
+@end
+
+@interface Shell (Process)
+- (void) wait: (int) i;
+@end
+
+@interface Shell (Execute)
 - (id) execute: (id) obj message: (const char *) msg;
 - (char *) buildArguments: (char **) line;
 - (void) execute: (char *) f tree: (struct Tree *) at;
+@end
+
+@interface Shell (Lexer)
 - (void) word;
 - (void) expand: (int) i value: (char *) na;
-- (void) main;
-- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
+- (int) readCharacter;
+- (int) getCharacter: (int) flag;
+@end
+
+@interface Shell (Parser)
 - (struct Tree *) syntax: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn1: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn2: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn3: (char **) p1 end: (char **) p2;
 - (struct Tree *) tree;
-- (void) wait: (int) i;
 @end
 
 @interface Shell (Miscellaneous)
-- (int) readCharacter;
 - (void) printString: (const char *) as;
 - (void) putCharacter: (int) c;
 - (void) printNumber: (int) n;
@@ -158,7 +174,6 @@ extern jmp_buf jmp;
 - (int) equalString: (const char *) as1 to: (const char *) as2;
 - (void) error: (const char *) s code: (int) exitno;
 - (int) lastCharacter: (char *) cp;
-- (int) getCharacter: (int) flag;
 - (void) scan: (struct Tree *) at selector: (SEL) sel;
 - (int) glob: (int) c;
 - (int) trim: (int) c;
