@@ -144,4 +144,64 @@
 	}
 	return NULL;
 }
+
+- (char *) getPIDPointer
+{
+	return pidp;
+}
+
+- (void) setPIDPointer: (char *) ptr
+{
+	(void) memcpy(pidp, ptr, sizeof pidp);
+}
+
+- (struct Tree *) getTreeBuffer
+{
+	return trebuf;
+}
+
+- (void) setTreeBuffer: (struct Tree *) ptr
+{
+	(void) memcpy(trebuf, ptr, sizeof trebuf);
+}
+
+- (char **) getArguments
+{
+	return args;
+}
+
+- (void) setArguments: (char **) ptr
+{
+	(void) memcpy(args, ptr, sizeof args);
+}
+
+- (char (*)[]) getSetA
+{
+	return seta;
+}
+
+- (void) setSetA: (char (*)[]) ptr
+{
+	(void) memcpy(seta, ptr, sizeof seta);
+}
+
+- (char *) getMessage
+{
+	return msg;
+}
+
+- (void) setMessage: (char *) ptr
+{
+	(void) memcpy(msg, ptr, sizeof msg);
+}
+
+- (char *) getLine
+{
+	return line;
+}
+
+- (void) setLine: (char *) ptr
+{
+	(void) memcpy(line, ptr, sizeof line);
+}
 @end
