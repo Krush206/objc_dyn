@@ -83,6 +83,7 @@ loop:
 	peekc = [shell getCharacter: !DOLREPL];
 	[shell main];
 	goto loop;
+	object_dispose(shell);
 	return 0;
 }
 
@@ -161,16 +162,16 @@ loop:
 
 - (char *) buildArguments: (char **) word
 {
-	struct ArgumentList *arg;
-	char **wp;
+	register struct ArgumentList *new;
+	register char **wp;
 	char *sel;
-	char *cur;
+	register char *cur;
 	size_t len;
 
 	if(word[0] == NULL)
 		return NULL;
 	len = 0;
-	for(wp = word; *wp; wp++) {
+	for(wp = word; *wp; wp++)
 		if([self lastCharacter: *wp] == ':') {
 			if(wp[1] == NULL) {
 				[self printString: "@"];
@@ -178,25 +179,23 @@ loop:
 				return NULL;
 			}
 			len += strlen(*wp);
-			arg = malloc(sizeof *arg);
-			arg->arg = wp[1];
-			arg->next = argdef;
-			arg->prev = argdef->prev;
-			argdef->prev->next = arg;
-			argdef->prev = arg;
+			new = malloc(sizeof *new);
+			new->arg = wp[1];
+			new->next = argdef;
+			new->prev = argdef->prev;
+			argdef->prev->next = new;
+			argdef->prev = new;
 		}
-	}
 	if(len == 0)
 		return strcpy(malloc(strlen(word[0]) + 1), word[0]);
 	sel = malloc(len + 1);
 	cur = sel;
-	for(wp = word; *wp; wp++) {
+	for(wp = word; *wp; wp++)
 		if([self lastCharacter: *wp] == ':') {
 			len = strlen(*wp);
 			(void) memcpy(cur, *wp, len);
 			cur += len;
 		}
-	}
 	*cur = '\0';
 	return sel;
 }
@@ -225,11 +224,12 @@ loop:
 				peekc = c;
 				return;
 			}
-			if (c1 == '"' && c == '\\' &&
-				((peekc = [self getCharacter: !DOLREPL]) == '$' ||
-				peekc == '"')) {
-					c = peekc;
-					peekc = 0;
+			if (c1 == '"' &&
+			    c == '\\' &&
+			    ((peekc = [self getCharacter: !DOLREPL]) == '$' ||
+			     peekc == '"')) {
+				c = peekc;
+				peekc = 0;
 			}
 			*linep++ = c|QUOTE;
 		}
@@ -419,7 +419,7 @@ null:
 		if((f&FPAR) == 0)
 			i = fork();
 		if(i == -1) {
-			err(ERR_AGAIN, 255);
+			[self error: ERR_AGAIN code: 255];
 			break;
 		}
 		if(i != 0) {
@@ -442,7 +442,7 @@ null:
 			i = open(t->DLPT, 0);
 			if(i < 0) {
 				[self printString: t->DLPT];
-				err(ERR_OPEN, 255);
+				[self error: ERR_OPEN code: 255];
 				exit(255);
 			}
 		}
@@ -457,7 +457,7 @@ null:
 			i = creat(t->DRPT, 0666);
 			if(i < 0) {
 				[self printString: t->DRPT];
-				err(ERR_CREATE, 255);
+				[self error: ERR_CREATE code: 255];
 				exit(255);
 			}
 f1:
@@ -508,7 +508,7 @@ f1:
 		*linep = 0;
 		[self execute: t->DARR[0] tree: t];
 		[self printString: t->DARR[0]];
-		err(ERR_FOUND, 255);
+		[self error: ERR_FOUND code: 255];
 		exit(255);
 
 	case TFIL:
@@ -765,7 +765,7 @@ out:
 			}
 			else
 				[self printString: strsignal(e)];
-			err("", (s>>8)|e);
+			[self error: "" code: (s>>8)|e];
 		}
 	}
 }
@@ -822,7 +822,7 @@ retry:
 			break;
 		case ENOMEM:
 			[self printString: f];
-			err(ERR_LARGE, 255);
+			[self error: ERR_LARGE code: 255];
 			exit(255);
 		case E2BIG:
 			txe2big++;
@@ -830,7 +830,7 @@ retry:
 		case ETXTBSY:
 			if((txtbsy += 10) > 60) {
 				[self printString: f];
-				err(": text busy", 255);
+				[self error: ": text busy" code: 255];
 				exit(255);
 			}
 			sleep(txtbsy);
@@ -839,18 +839,18 @@ retry:
 	} while(path != NULL);
 	if(txe2big) {
 		[self printString: f];
-		err(": argument list too long", 255);
+		[self error: ": argument list too long" code: 255];
 		exit(255);
 	}
 	if(txeacces) {
 		[self printString: f];
-		err(": file not executable", 255);
+		[self error: ": file not executable" code: 255];
 		exit(255);
 	}
 	return;
 toolong:
 	[self printString: f];
-	err(": path too long", 255);
+	[self error: ": path too long" code: 255];
 	exit(255);
 }
 @end
