@@ -33,6 +33,13 @@
 
 #import "objc_dyn.h"
 
+int treec;
+int errval;
+int idolp;
+char *dolp;
+char (*pidp)[NUMSIZ];
+char **dolv;
+int dolc;
 char *promp;
 char *linep;
 char *elinep;
@@ -41,16 +48,16 @@ char **eargp;
 int peekc;
 int gflg;
 int error;
-int dolc;
-int idolp;
-char pidp[NUMSIZ];
-char *dolp;
-char **dolv;
-char seta[26][EXPSIZ];
-int treec;
-char line[LINSIZ];
-char *args[ARGSIZ];
-struct Tree trebuf[TRESIZ];
+int uid;
+int setintr;
+char *arginp;
+int onelflg;
+int stoperr;
+int execflg;
+char (*seta)[26][EXPSIZ];
+char (*line)[LINSIZ];
+char *(*args)[ARGSIZ];
+struct Tree (*trebuf)[TRESIZ];
 jmp_buf jmp;
 
 static struct ObjectList *objdef;
@@ -65,25 +72,63 @@ main(int c, char *av[])
 @implementation Shell
 + (int) argc: (int) c argv: (char *[]) av
 {
-	id shell;
+	register id shell;
+	register char **v;
+	register int f;
 
 	shell = class_create_instance(self);
 	[shell loadClass: "Object"];
 	objdef = [shell getObjectList];
 	argdef = [shell getArgumentList];
-	(void) strcpy(pidp, [shell integerToASCII: getpid()]);
+	pidp = malloc(sizeof *pidp);
+	(void) strcpy(*pidp, [shell integerToASCII: getpid()]);
+	v = av;
 	promp = "% ";
 	if(getuid() == 0)
 		promp = "# ";
 	if(!isatty(0))
 		promp = NULL;
+	stoperr = 0;
+	if(c>1 && v[1][0]=='-' && v[1][1]=='e') {
+		++stoperr;
+		v[1] = v[0];
+		++v;
+		--c;
+	}
+	arginp = 0;
+	execflg = onelflg = 0;
+	if(c > 1) {
+		promp = 0;
+		if (*v[1]=='-') {
+			execflg = 1;
+			if (v[1][1]=='c' && c>2)
+				arginp = v[2];
+			else if (v[1][1]=='t')
+				onelflg = 2;
+		} else {
+			close(0);
+			f = open(v[1], 0);
+			if(f < 0) {
+				[shell printString: v[1]];
+				[shell error: ERR_OPEN code: 255];
+			}
+		}
+	}
+	setintr = 0;
+	if(execflg) {
+		signal(SIGQUIT, SIG_DFL);
+		signal(SIGINT, SIG_DFL);
+		if (arginp==0&&onelflg==0)
+			setintr++;
+	}
+	dolv = v;
+	dolc = c;
 loop:
 	if(promp != NULL)
 		[shell printString: promp];
 	peekc = [shell getCharacter: !DOLREPL];
 	[shell main];
 	goto loop;
-	object_dispose(shell);
 	return 0;
 }
 
@@ -286,7 +331,7 @@ pack:
 	register char *st, *np;
 	char c;
 
-	st = seta[i];
+	st = (*seta)[i];
 	np = na;
 	if(np == NULL)
 		goto null;
@@ -305,10 +350,15 @@ null:
 	register char  *cp;
 	register struct Tree *t;
 
-	argp = args;
-	eargp = args+ARGSIZ-1;
-	linep = line;
-	elinep = line+LINSIZ-1;
+	args = malloc(sizeof *args);
+	line = malloc(sizeof *line);
+	seta = malloc(sizeof *seta);
+	pidp = malloc(sizeof *pidp);
+	trebuf = malloc(sizeof *trebuf);
+	argp = *args;
+	eargp = *args+ARGSIZ-1;
+	linep = *line;
+	elinep = *line+LINSIZ-1;
 	error = 0;
 	gflg = 0;
 	do {
@@ -321,7 +371,7 @@ null:
 			setjmp(jmp);
 			if (error)
 				return;
-			t = [self syntax: args end: argp];
+			t = [self syntax: *args end: argp];
 		}
 		if(error != 0)
 			[self error: ERR_SYNTAX code: 255]; else
@@ -481,7 +531,7 @@ f1:
 			close(0);
 			open("/dev/null", 0);
 		}
-		if((f&FINT) == 0) {
+		if((f&FINT) == 0 && setintr) {
 			signal(SIGINT, SIG_IGN);
 			signal(SIGQUIT, SIG_IGN);
 		}
@@ -739,34 +789,43 @@ out:
 		error++;
 		longjmp(jmp, 1);
 	}
-	return(&trebuf[treec++]);
+	return(&(*trebuf)[treec++]);
 }
 
 - (void) wait: (int) i
 {
 	register int p, e;
 	int s;
+	const char *message;
 
 	for(;;) {
 		p = wait(&s);
 		if(p == -1)
 			break;
-		e = s&0177;
-		if(e) {
-			if(e>=NSIG) {
-				if(p != i) {
-					[self printNumber: p];
-					[self printString: ": "];
-				}
-				[self printString: "Signal "];
-				[self printNumber: e];
-				if(s&0200)
-					[self printString: " -- Core dumped"];
-			}
-			else
-				[self printString: strsignal(e)];
-			[self error: "" code: (s>>8)|e];
+		if(WIFEXITED(s)) {
+			errval |= WEXITSTATUS(s);
+			if(WEXITSTATUS(s) && stoperr)
+				[self error: "" code: WEXITSTATUS(s)];
+			continue;
 		}
+		if(!WIFSIGNALED(s))
+			continue;
+		e = WTERMSIG(s);
+		if(p != i) {
+			[self printNumber: p];
+			[self printString: ": "];
+		}
+		message = strsignal(e);
+		if(message)
+			[self printString: message];
+		else {
+			[self printString: "Signal "];
+			[self printNumber: e];
+		}
+		if(WCOREDUMP(s))
+			[self printString: " -- Core dumped"];
+		[self error: "" code: e];
+		errval |= e;
 	}
 }
 
