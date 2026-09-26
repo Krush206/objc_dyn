@@ -7,6 +7,8 @@
 #import <setjmp.h>
 #import <errno.h>
 #import <sys/wait.h>
+#import <fcntl.h>
+
 #import "/usr/local/include/objc/Object.h"
 #import "/usr/local/include/objc/objc-api.h"
 
