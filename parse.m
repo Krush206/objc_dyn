@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "objc_dyn.h"
+#import "sh.h"
 
 @implementation Shell (Parser)
 /*
