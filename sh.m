@@ -165,14 +165,4 @@ loop:
 			[self execute: t input: NULL output: NULL];
 	}
 }
-
-- (struct Tree *) tree
-{
-	if(treec == TRESIZ) {
-		[self printString: "Command line overflow\n"];
-		error++;
-		longjmp(jmp, 1);
-	}
-	return(&(*trebuf)[treec++]);
-}
 @end
