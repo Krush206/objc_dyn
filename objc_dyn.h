@@ -108,6 +108,13 @@ struct Tree {
 	} t_dcom;
 };
 
+extern int treec;
+extern int errval;
+extern int idolp;
+extern char *dolp;
+extern char (*pidp)[];
+extern char **dolv;
+extern int dolc;
 extern char *promp;
 extern char *linep;
 extern char *elinep;
@@ -116,21 +123,19 @@ extern char **eargp;
 extern int peekc;
 extern int gflg;
 extern int error;
-extern int dolc;
-extern int idolp;
-extern char (*pidp)[NUMSIZ];
-extern char *dolp;
-extern char **dolv;
-extern char (*seta)[][EXPSIZ];
-extern int treec;
-extern int onelflg;
-extern int errval;
-extern int execflg;
+extern int uid;
+extern int setintr;
 extern char *arginp;
-extern char (*line)[LINSIZ];
-extern char *(*args)[ARGSIZ];
-extern struct Tree (*trebuf)[TRESIZ];
+extern int onelflg;
+extern int stoperr;
+extern int execflg;
+extern char (*seta)[][EXPSIZ];
+extern char (*line)[];
+extern char *(*args)[];
+extern struct Tree (*trebuf)[];
 extern jmp_buf jmp;
+extern struct ObjectList *objdef;
+extern struct ArgumentList *argdef;
 
 @interface Shell: Object
 + (int) argc: (int) c argv: (char *[]) av;
@@ -138,7 +143,7 @@ extern jmp_buf jmp;
 @end
 
 @interface Shell (Semantic)
-- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
+- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
 @end
 
 @interface Shell (Process)
