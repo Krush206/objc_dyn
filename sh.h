@@ -57,7 +57,7 @@
 #define ERR_CHAR "Too many characters"
 #define ERR_ARGS "Too many args"
 #define ERR_BADMSG ": bad message"
-#define ERR_LONGMSG ": message too long"
+#define ERR_LNGMSG ": message too long"
 
 #define DOLREPL 1
 #define DOLREPQ 2
@@ -172,29 +172,15 @@ extern struct Argument *argdef;
 - (void) setPIDPointer: (char *) ptr;
 - (char *) getLine;
 - (void) setLine: (char *) ptr;
+- (char **) getArguments;
+- (void) setArguments: (char **) ptr;
 - (struct Tree *) getTreeBuffer;
 - (void) setTreeBuffer: (struct Tree *) ptr;
+- (struct Argument *) getArgumentBuffer;
+- (void) setArgumentBuffer: (struct Argument *) ptr;
 - (char *) getMessage;
 - (void) setMessage: (char *) ptr;
 - (char (*)[]) getSetASCII;
 - (void) setSetASCII: (char (*)[]) ptr;
-@end
-
-@interface Shell (Runtime)
-- (void) allocRootClass: (struct RootList *) rootnew;
-- (void) forEachRootClass: (struct RootList *) rootnew;
-- (void) loadRootClass: (struct RootList *) rootnew
-	 class: (struct ClassList *) clsnew;
-- (void) loadClass: (const char *) rootname;
-- (Class) getRootClass: (Class) cls;
-- (Class) getClass: (const char *) clsname;
-- (id) getObject: (const char *) objname;
-- (struct ObjectList *) getObjectRecord: (const char *) objname;
-- (struct ClassList *) getClassRecord: (const char *) clsname;
-- (void) setRootClass: (const char *) new;
-- (struct ObjectList *) getObjectList;
-- (struct Argument *) getArgumentList;
-- (void) freeArgument: (struct Argument *) argnew;
-- (void) resolveLinks;
 @end
 #endif /* !SH_H */
