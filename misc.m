@@ -129,16 +129,16 @@
 
 - (char *) integerToASCII: (int) n
 {
-	register int i, j;
+	register int i;
 	register char *cp;
 	static char str[NUMSIZ];
 
-	j = n;
+	i = n;
 	cp = &str[sizeof str - 1];
 	for (;;) {
-		*cp = j % 10 + '0';
-		j /= 10;
-		if(j == 0)
+		*cp = i % 10 + '0';
+		i /= 10;
+		if(i == 0)
 			return cp;
 		cp--;
 	}
