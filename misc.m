@@ -108,11 +108,13 @@
 - (void) scan: (struct Tree *) at selector: (SEL) sel
 {
 	register char *p, **t, c;
+	void *imp;
 
 	t = at->DARR;
+	imp = objc_msg_lookup(self, sel);
 	while((p = *t++))
 		while((c = *p))
-			;
+			*p++ = (*(int (*)(id, SEL, int)) imp)(self, sel, c);
 }
 
 - (int) glob: (int) c
@@ -165,6 +167,16 @@
 	(void) memcpy(trebuf, ptr, sizeof trebuf);
 }
 
+- (char **) getArguments
+{
+	return args;
+}
+
+- (void) setArguments: (char **) ptr
+{
+	(void) memcpy(args, ptr, sizeof args);
+}
+
 - (char (*)[]) getSetASCII
 {
 	return seta;
@@ -193,5 +205,15 @@
 - (void) setLine: (char *) ptr
 {
 	(void) memcpy(line, ptr, sizeof line);
+}
+
+- (struct Argument *) getArgumentBuffer
+{
+	return argbuf;
+}
+
+- (void) setArgumentBuffer: (struct Argument *) ptr
+{
+	(void) memcpy(argbuf, ptr, sizeof argbuf);
 }
 @end
