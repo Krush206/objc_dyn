@@ -59,9 +59,8 @@ char (*line)[LINSIZ];
 char *(*args)[ARGSIZ];
 struct Tree (*trebuf)[TRESIZ];
 jmp_buf jmp;
-
-static struct ObjectList *objdef;
-static struct ArgumentList *argdef;
+struct ObjectList *objdef;
+struct ArgumentList *argdef;
 
 int
 main(int c, char *av[])
