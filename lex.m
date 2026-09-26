@@ -39,7 +39,7 @@ static char subchar = '$';
 - (void) word
 {
 	register char c, c1;
-	register dolflag;
+	register int dolflag;
 
 	*argp++ = linep;
 
@@ -165,7 +165,7 @@ null:
 	}
 getd:
 	if(dolp) {
-		if (c = *dolp++) {
+		if ((c = *dolp++)) {
 			if (flag == DOLREPQ)
 				c |= QUOTE;
 			return c;
