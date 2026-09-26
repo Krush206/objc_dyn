@@ -84,10 +84,10 @@ main(int c, char *av[])
 		++v;
 		--c;
 	}
-	arginp = 0;
+	arginp = NULL;
 	execflg = onelflg = 0;
 	if(c > 1) {
-		promp = 0;
+		promp = NULL;
 		if (*v[1]=='-') {
 			execflg = 1;
 			if (v[1][1]=='c' && c>2)
@@ -107,7 +107,7 @@ main(int c, char *av[])
 	if(execflg) {
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGINT, SIG_DFL);
-		if (arginp==0&&onelflg==0)
+		if (arginp==NULL&&onelflg==0)
 			setintr++;
 	}
 	dolv = v;
