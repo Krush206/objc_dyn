@@ -117,12 +117,12 @@ pack:
 	}
 }
 
-- (void) expand: (int) i value: (char *) na
+- (void) setVariable: (int) i value: (char *) na
 {
 	register char *st, *np;
 	char c;
 
-	st = (*seta)[i];
+	st = seta[i];
 	np = na;
 	if(np == NULL)
 		goto null;
@@ -185,11 +185,11 @@ getd:
 			goto getd;
 		}
 		else if(c>='a' && c<='z') {
-			dolp = (*seta)[c-'a'];
+			dolp = seta[c-'a'];
 			goto getd;
 		}
 		else if(c == '$') {
-			dolp = *pidp;
+			dolp = pidp;
 			goto getd;
 		}
 		/* $* = $1 $2 .... */
