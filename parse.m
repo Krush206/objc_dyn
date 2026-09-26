@@ -240,6 +240,6 @@ out:
 		error++;
 		longjmp(jmp, 1);
 	}
-	return(&(*trebuf)[treec++]);
+	return(&trebuf[treec++]);
 }
 @end
