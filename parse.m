@@ -1,0 +1,212 @@
+#import "objc_dyn.h"
+
+@implementation Shell (Parser)
+/*
+ * syntax
+ *	empty
+ *	syn1
+ */
+
+- (struct Tree *) syntax: (char **) p1 end: (char **) p2
+{
+	while(p1 != p2) {
+		if([self anyCharacter: **p1 in: ";&\n"])
+			p1++; else
+			return [self syn1: p1 end: p2];
+	}
+	return(0);
+}
+
+/*
+ * syn1
+ *	syn2
+ *	syn2 & syntax
+ *	syn2 ; syntax
+ */
+
+- (struct Tree *) syn1: (char **) p1 end: (char **) p2
+{
+	register char **p;
+	register struct Tree *t;
+	int l;
+
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(**p) {
+
+	case '(':
+		l++;
+		continue;
+
+	case ')':
+		l--;
+		continue;
+
+	case '&':
+	case ';':
+	case '\n':
+		if(l == 0) {
+			register struct Tree *t1;
+
+			l = **p;
+			t = [self tree];
+			t->DTYP = TLST;
+			t->DLEF = [self syn2: p1 end: p];
+			t->DFLG = 0;
+			if(l == '&') {
+				t1 = t->DLEF;
+				t->DFLG |= FAND|FPRS|FINT;
+			}
+			if((t1 = [self syntax: p+1 end: p2]))
+				t->DRIT = t1; else
+				t->DRIT = 0;
+			return(t);
+		}
+	}
+	if(l == 0)
+		return [self syn2: p1 end: p2];
+	error++;
+	return(0);
+}
+
+/*
+ * syn2
+ *	syn3
+ *	syn3 | syn2
+ */
+
+- (struct Tree *) syn2: (char **) p1 end: (char **) p2
+{
+	register char **p;
+	register int l;
+	register struct Tree *t;
+
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(**p) {
+
+	case '(':
+		l++;
+		continue;
+
+	case ')':
+		l--;
+		continue;
+
+	case '|':
+	case '^':
+		if(l == 0) {
+			t = [self tree];
+			t->DTYP = TFIL;
+			t->DLEF = [self syn3: p1 end: p];
+			t->DRIT = [self syn2: p+1 end: p2];
+			t->DFLG = 0;
+			return(t);
+		}
+	}
+	return [self syn3: p1 end: p2];
+}
+
+/*
+ * syn3
+ *	( syn1 ) [ < in  ] [ > out ]
+ *	word word* [ < in ] [ > out ]
+ */
+
+- (struct Tree *) syn3: (char **) p1 end: (char **) p2
+{
+	register char **p;
+	char **lp, **rp, *i, *o;
+	register struct Tree *t;
+	int n, l, c, flg;
+
+	flg = 0;
+	if(**p2 == ')')
+		flg |= FPAR;
+	lp = 0;
+	rp = 0;
+	i = 0;
+	o = 0;
+	n = 0;
+	l = 0;
+	for(p=p1; p!=p2; p++)
+	switch(c = **p) {
+
+	case '(':
+		if(l == 0) {
+			if(lp != 0)
+				error++;
+			lp = p+1;
+		}
+		l++;
+		continue;
+
+	case ')':
+		l--;
+		if(l == 0)
+			rp = p;
+		continue;
+
+	case '>':
+		p++;
+		if(p!=p2 && **p=='>')
+			flg |= FCAT; else
+			p--;
+
+	case '<':
+		if(l == 0) {
+			p++;
+			if(p == p2) {
+				error++;
+				p--;
+			}
+			if([self anyCharacter: **p in: "<>("])
+				error++;
+			if(c == '<') {
+				if(i != 0)
+					error++;
+				i = *p;
+				continue;
+			}
+			if(o != 0)
+				error++;
+			o = *p;
+		}
+		continue;
+
+	default:
+		if(l == 0)
+			p1[n++] = *p;
+	}
+	if(lp != 0) {
+		if(n != 0)
+			error++;
+		t = [self tree];
+		t->DTYP = TPAR;
+		t->DSTR = [self syn1: lp end: rp];
+		goto out;
+	}
+	if(n == 0)
+		error++;
+	p1[n++] = 0;
+	t = [self tree];
+	t->DTYP = TCOM;
+	for(l=0; l<n; l++)
+		t->DARR[l] = p1[l];
+out:
+	t->DFLG = flg;
+	t->DLPT = i;
+	t->DRPT = o;
+	return(t);
+}
+
+- (struct Tree *) tree
+{
+	if(treec == TRESIZ) {
+		[self printString: "Command line overflow\n"];
+		error++;
+		longjmp(jmp, 1);
+	}
+	return(&(*trebuf)[treec++]);
+}
+@end
