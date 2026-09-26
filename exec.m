@@ -113,22 +113,13 @@
 	len = i = (size_t) 0;
 	for(wp = word; *wp; wp++)
 		if([self lastCharacter: *wp] == ':') {
-			if(wp[1] == NULL) {
-				[self printString: "@"];
-				[self error: ERR_BADMSG code: 255];
-				return NULL;
-			}
+			if(wp[1] == NULL)
+				goto badmsg;
 			len += strlen(*wp);
-			if(len >= sizeof msg) {
-				[self printString: "@"];
-				[self error: ERR_LONGMSG code: 255];
-				return NULL;
-			}
-			if(i >= LSTSIZ) {
-				[self printString: "@"];
-				[self error: "too many arguments" code: 255];
-				return NULL;
-			}
+			if(len >= sizeof msg)
+				goto toolong;
+			if(i >= LSTSIZ)
+				goto many;
 			new = &argbuf[i++];
 			new->arg = wp[1];
 			new->next = argdef;
@@ -137,11 +128,8 @@
 			argdef->prev = new;
 		}
 	if(len == 0) {
-		if(strlen(word[0]) >= sizeof msg) {
-			[self printString: "@"];
-			[self error: ERR_LONGMSG code: 255];
-			return NULL;
-		}
+		if(strlen(word[0]) >= sizeof msg)
+			goto toolong;
 		return strcpy(msg, word[0]);
 	}
 	cur = msg;
@@ -153,6 +141,18 @@
 		}
 	*cur = '\0';
 	return msg;
+many:
+	[self printString: "@"];
+	[self error: ": too many arguments" code: 255];
+	return NULL;
+toolong:
+	[self printString: "@"];
+	[self error: ERR_LNGMSG code: 255];
+	return NULL;
+badmsg:
+	[self printString: "@"];
+	[self error: ERR_BADMSG code: 255];
+	return NULL;
 }
 
 - (void) execute: (char *) f tree: (struct Tree *) at
