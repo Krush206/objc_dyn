@@ -196,12 +196,7 @@ f1:
 			exit(255);
 		}
 		gflg = 0;
-		for(i = 0; (cp1 = t->DARR[i]) != NULL; i++)
-			for(cp2 = cp1; *cp2; cp2++) {
-				if([self anyCharacter: *cp2 in: "[?*"])
-					gflg = 1;
-				*cp2 &= 0177;
-			}
+		[self scan: t selector: @selector(glob:)];
 		if(gflg) {
 			t->DARR[0] = "/etc/glob";
 			t->DARR[1] = NULL;
@@ -209,6 +204,7 @@ f1:
 			[self printString: "glob: cannot execute\n"];
 			exit(255);
 		}
+		[self scan: t selector: @selector(trim:)];
 		*linep = 0;
 		[self execute: t->DARR[0] tree: t];
 		[self printString: t->DARR[0]];
