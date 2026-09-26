@@ -13,6 +13,7 @@
 #import "/usr/local/include/objc/objc-api.h"
 
 #define QUOTE 0200
+
 #define FAND 1
 #define FCAT 2
 #define FPIN 4
@@ -41,6 +42,7 @@
 #define TRESIZ 100
 #define NUMSIZ 12
 #define CMDSIZ 100
+#define MSGSIZ 100
 
 #define ERR_SYNTAX "syntax error"
 #define ERR_EQUALS "'=' error"
@@ -114,7 +116,6 @@ extern int treec;
 extern int errval;
 extern int idolp;
 extern char *dolp;
-extern char (*pidp)[];
 extern char **dolv;
 extern int dolc;
 extern char *promp;
@@ -131,15 +132,20 @@ extern char *arginp;
 extern int onelflg;
 extern int stoperr;
 extern int execflg;
-extern char (*seta)[][EXPSIZ];
-extern char (*line)[];
-extern char *(*args)[];
-extern struct Tree (*trebuf)[];
 extern jmp_buf jmp;
 extern struct ObjectList *objdef;
 extern struct ArgumentList *argdef;
 
 @interface Shell: Object
+{
+@private
+	char msg[MSGSIZ];
+	char seta[26][EXPSIZ];
+	char line[LINSIZ];
+	char *args[ARGSIZ];
+	char pidp[NUMSIZ];
+	struct Tree trebuf[TRESIZ];
+}
 + (int) argc: (int) c argv: (char *[]) av;
 - (void) main;
 @end
@@ -160,7 +166,7 @@ extern struct ArgumentList *argdef;
 
 @interface Shell (Lexer)
 - (void) word;
-- (void) expand: (int) i value: (char *) na;
+- (void) setVariable: (int) i value: (char *) na;
 - (int) readCharacter;
 - (int) getCharacter: (int) flag;
 @end
@@ -185,6 +191,18 @@ extern struct ArgumentList *argdef;
 - (int) glob: (int) c;
 - (int) trim: (int) c;
 - (char *) integerToASCII: (int) n;
+- (char *) getPIDPointer;
+- (void) setPIDPointer: (char *) ptr;
+- (char *) getLine;
+- (void) setLine: (char *) ptr;
+- (char **) getArguments;
+- (void) setArguments: (char **) ptr;
+- (struct Tree *) getTreeBuffer;
+- (void) setTreeBuffer: (struct Tree *) ptr;
+- (char *) getMessage;
+- (void) setMessage: (char *) ptr;
+- (char (*)[]) getSetA;
+- (void) setSetA: (char (*)[]) ptr;
 @end
 
 @interface Shell (Runtime)
