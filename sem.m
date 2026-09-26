@@ -72,7 +72,7 @@
 				[self error: ERR_EQUALS code: 255];
 				break;
 			}
-			[self expand: i value: t->DARR[2]];
+			[self setVariable: i value: t->DARR[2]];
 			break;
 		}
 		if([self equalString: cp1 to: "chdir"]) {
