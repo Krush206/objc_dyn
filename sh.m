@@ -37,7 +37,6 @@ int treec;
 int errval;
 int idolp;
 char *dolp;
-char (*pidp)[NUMSIZ];
 char **dolv;
 int dolc;
 char *promp;
@@ -54,10 +53,6 @@ char *arginp;
 int onelflg;
 int stoperr;
 int execflg;
-char (*seta)[26][EXPSIZ];
-char (*line)[LINSIZ];
-char *(*args)[ARGSIZ];
-struct Tree (*trebuf)[TRESIZ];
 jmp_buf jmp;
 struct ObjectList *objdef;
 struct ArgumentList *argdef;
@@ -79,8 +74,8 @@ main(int c, char *av[])
 	[shell loadClass: "Object"];
 	objdef = [shell getObjectList];
 	argdef = [shell getArgumentList];
-	pidp = malloc(sizeof *pidp);
-	(void) strcpy(*pidp, [shell integerToASCII: getpid()]);
+	(void) strcpy([shell getPIDPointer],
+		      [shell integerToASCII: getpid()]);
 	v = av;
 	promp = "% ";
 	if(getuid() == 0)
@@ -136,15 +131,10 @@ loop:
 	register char  *cp;
 	register struct Tree *t;
 
-	args = malloc(sizeof *args);
-	line = malloc(sizeof *line);
-	seta = malloc(sizeof *seta);
-	pidp = malloc(sizeof *pidp);
-	trebuf = malloc(sizeof *trebuf);
-	argp = *args;
-	eargp = *args+ARGSIZ-1;
-	linep = *line;
-	elinep = *line+LINSIZ-1;
+	argp = args;
+	eargp = args+ARGSIZ-1;
+	linep = line;
+	elinep = line+LINSIZ-1;
 	error = 0;
 	gflg = 0;
 	do {
@@ -157,7 +147,7 @@ loop:
 			setjmp(jmp);
 			if (error)
 				return;
-			t = [self syntax: *args end: argp];
+			t = [self syntax: args end: argp];
 		}
 		if(error != 0)
 			[self error: ERR_SYNTAX code: 255]; else
