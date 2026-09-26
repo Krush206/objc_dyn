@@ -36,85 +36,16 @@
 @implementation Shell (Semantic)
 - (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
 {
-	int i, f, pv[2];
+	int pv[2];
+	register int f, i;
 	register struct Tree *t1;
-	register char *cp1, *cp2;
 
 	if(t == NULL)
 		return;
 	switch(t->DTYP) {
 
 	case TCOM:
-		cp1 = t->DARR[0];
-		cp2 = t->DARR[1];
-		if([self equalString: cp1 to: "@"]) {
-			char *msg;
-
-			if(cp2 == NULL) {
-				[self printString: cp1];
-				[self error: ERR_BADMSG code: 255];
-				break;
-			}
-			msg = [self buildArguments: &t->DARR[1]];
-			if(msg == NULL)
-				break;
-			[self execute: self message: msg];
-			break;
-		}
-		if([self equalString: cp1 to: "="]) {
-			if(cp2 == NULL) {
-				[self error: ERR_EQUALS code: 255];
-				break;
-			}
-			i = *cp2 - 'a';
-			if(i>25 || i<0) {
-				[self error: ERR_EQUALS code: 255];
-				break;
-			}
-			[self setVariable: i value: t->DARR[2]];
-			break;
-		}
-		if([self equalString: cp1 to: "chdir"]) {
-			if(t->DARR[1] != 0) {
-				if(chdir(t->DARR[1]) < 0) {
-					[self printString: cp1];
-					[self error: ERR_BADDIR code: 255];
-				}
-				break;
-			}
-			[self printString: cp1];
-			[self error: ERR_COUNT code: 255];
-			break;
-		}
-		if([self equalString: cp1 to: "shift"]) {
-			if(dolc < 1) {
-				[self printString: "shift: no args\n"];
-				break;
-			}
-			dolv[1] = dolv[0];
-			dolv++;
-			dolc--;
-			break;
-		}
-		if([self equalString: cp1 to: "login"]) {
-			if(promp != 0) {
-				execv("/bin/login", t->DARR);
-			}
-			[self printString: "login: cannot execute\n"];
-			break;
-		}
-		if([self equalString: cp1 to: "newgrp"]) {
-			if(promp != 0) {
-				execv("/bin/newgrp", t->DARR);
-			}
-			[self printString: "newgrp: cannot execute\n"];
-			break;
-		}
-		if([self equalString: cp1 to: "wait"]) {
-			[self wait: -1];
-			break;
-		}
-		if([self equalString: cp1 to: ":"])
+		if([func scan: t])
 			break;
 
 	case TPAR:
