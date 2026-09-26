@@ -59,18 +59,21 @@ struct Argument *argdef;
 int
 main(int c, char *av[])
 {
-	return [Shell argc: c argv: av];
+	return [Shell argumentCount: c argumentVector: av];
 }
 
 @implementation Shell
-+ (int) argc: (int) c argv: (char *[]) av
++ (int) argumentCount: (int) c argumentVector: (char *[]) av
 {
 	register id sh;
 	register char **v;
-	register int f;
+	register id obj;
+	int f;
 
 	sh = class_create_instance(self);
 	(void) strcpy([sh getPIDPointer], [sh integerToASCII: getpid()]);
+	[sh setFunction: obj = [Function new]];
+	[obj setShell: sh];
 	v = av;
 	promp = "% ";
 	if(getuid() == 0)
@@ -118,6 +121,7 @@ loop:
 	peekc = [sh getCharacter: !DOLREPL];
 	[sh main];
 	goto loop;
+	object_dispose(sh);
 	return 0;
 }
 
