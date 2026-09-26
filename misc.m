@@ -107,6 +107,7 @@
 
 - (void) scan: (struct Tree *) at selector: (SEL) sel
 {
+	typedef int (*method_t)(id, SEL, int);
 	register char *p, **t, c;
 	void *imp;
 
@@ -114,7 +115,7 @@
 	imp = objc_msg_lookup(self, sel);
 	while((p = *t++))
 		while((c = *p))
-			*p++ = (*(int (*)(id, SEL, int)) imp)(self, sel, c);
+			*p++ = (*(method_t) imp)(self, sel, c);
 }
 
 - (int) glob: (int) c
@@ -215,5 +216,15 @@
 - (void) setArgumentBuffer: (struct Argument *) ptr
 {
 	(void) memcpy(argbuf, ptr, sizeof argbuf);
+}
+
+- (id) getFunction
+{
+	return func;
+}
+
+- (void) setFunction: (id) ptr
+{
+	func = ptr;
 }
 @end
