@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "objc_dyn.h"
+#import "sh.h"
 
 @implementation Shell (Miscellaneous)
 - (void) printString: (const char *) as
@@ -165,22 +165,12 @@
 	(void) memcpy(trebuf, ptr, sizeof trebuf);
 }
 
-- (char **) getArguments
-{
-	return args;
-}
-
-- (void) setArguments: (char **) ptr
-{
-	(void) memcpy(args, ptr, sizeof args);
-}
-
-- (char (*)[]) getSetA
+- (char (*)[]) getSetASCII
 {
 	return seta;
 }
 
-- (void) setSetA: (char (*)[]) ptr
+- (void) setSetASCII: (char (*)[]) ptr
 {
 	(void) memcpy(seta, ptr, sizeof seta);
 }
