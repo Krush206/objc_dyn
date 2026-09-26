@@ -36,18 +36,6 @@
 static char subchar = '$';
 
 @implementation Shell (Miscellaneous)
-- (int) readCharacter
-{
-	int rdstat, c;
-	char cc;
-
-	if((rdstat = read(0, &cc, (size_t) 1)) != 1) {
-		if(rdstat==0) exit(0); /* end of file*/
-		else exit(255); /* error */
-	}
-	return(c = cc);
-}
-
 - (void) printString: (const char *) as
 {
 	register const char *s;
@@ -168,11 +156,11 @@ getd:
 			goto getd;
 		}
 		else if(c>='a' && c<='z') {
-			dolp = seta[c-'a'];
+			dolp = (*seta)[c-'a'];
 			goto getd;
 		}
 		else if(c == '$') {
-			dolp = pidp;
+			dolp = *pidp;
 			goto getd;
 		}
 		/* $* = $1 $2 .... */
@@ -227,5 +215,31 @@ getd:
 		cp--;
 	}
 	return NULL;
+}
+
+- (int) readCharacter
+{
+	int rdstat;
+	char cc;
+	register int c;
+
+	if (arginp) {
+		if (*arginp == 1)
+			exit(errval);
+		if ((c = *arginp++) == 0) {
+			*arginp = 1;
+			c = '\n';
+		}
+		return(c);
+	}
+	if (onelflg==1)
+		exit(255);
+	if((rdstat = read(0, &cc, 1)) != 1) {
+		if(rdstat==0) exit(errval); /* end of file*/
+		else exit(255); /* error */
+	}
+	if (cc=='\n' && onelflg)
+		onelflg--;
+	return(cc);
 }
 @end
