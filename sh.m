@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "objc_dyn.h"
+#import "sh.h"
 
 int treec;
 int errval;
@@ -54,8 +54,7 @@ int onelflg;
 int stoperr;
 int execflg;
 jmp_buf jmp;
-struct ObjectList *objdef;
-struct ArgumentList *argdef;
+struct Argument *argdef;
 
 int
 main(int c, char *av[])
@@ -66,16 +65,12 @@ main(int c, char *av[])
 @implementation Shell
 + (int) argc: (int) c argv: (char *[]) av
 {
-	register id shell;
+	register id sh;
 	register char **v;
 	register int f;
 
-	shell = class_create_instance(self);
-	[shell loadClass: "Object"];
-	objdef = [shell getObjectList];
-	argdef = [shell getArgumentList];
-	(void) strcpy([shell getPIDPointer],
-		      [shell integerToASCII: getpid()]);
+	sh = class_create_instance(self);
+	(void) strcpy([sh getPIDPointer], [sh integerToASCII: getpid()]);
 	v = av;
 	promp = "% ";
 	if(getuid() == 0)
@@ -103,8 +98,8 @@ main(int c, char *av[])
 			close(0);
 			f = open(v[1], 0);
 			if(f < 0) {
-				[shell printString: v[1]];
-				[shell error: ERR_OPEN code: 255];
+				[sh printString: v[1]];
+				[sh error: ERR_OPEN code: 255];
 			}
 		}
 	}
@@ -119,9 +114,9 @@ main(int c, char *av[])
 	dolc = c;
 loop:
 	if(promp != NULL)
-		[shell printString: promp];
-	peekc = [shell getCharacter: !DOLREPL];
-	[shell main];
+		[sh printString: promp];
+	peekc = [sh getCharacter: !DOLREPL];
+	[sh main];
 	goto loop;
 	return 0;
 }
@@ -131,6 +126,9 @@ loop:
 	register char  *cp;
 	register struct Tree *t;
 
+	argdef = argbuf;
+	argdef->next = argdef;
+	argdef->prev = argdef;
 	argp = args;
 	eargp = args+ARGSIZ-1;
 	linep = line;
