@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "objc_dyn.h"
+#import "sh.h"
 
 @implementation Shell (Execute)
 - (id) execute: (id) obj message: (const char *) msg
@@ -42,16 +42,8 @@
 	void *arr[10];
 	Method_t met;
 	Class cls;
-	register struct ArgumentList *argnew;
+	register struct Argument *argnew;
 
-	i = 0;
-	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
-		i++;
-	if(i > 9)
-	{
-		[self error: "too many arguments" code: 255];
-		return nil;
-	}
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
 		arr[i++] = [self getObject: argnew->arg];
@@ -109,15 +101,16 @@
 
 - (char *) buildArguments: (char **) word
 {
-	register struct ArgumentList *new;
+	register struct Argument *new;
 	register char **wp;
-	char *sel;
 	register char *cur;
-	size_t len;
+	size_t len, i;
 
 	if(word[0] == NULL)
 		return NULL;
-	len = 0;
+	argdef->next = argdef;
+	argdef->prev = argdef;
+	len = i = (size_t) 0;
 	for(wp = word; *wp; wp++)
 		if([self lastCharacter: *wp] == ':') {
 			if(wp[1] == NULL) {
@@ -126,17 +119,32 @@
 				return NULL;
 			}
 			len += strlen(*wp);
-			new = malloc(sizeof *new);
+			if(len >= sizeof msg) {
+				[self printString: "@"];
+				[self error: ERR_LONGMSG code: 255];
+				return NULL;
+			}
+			if(i >= LSTSIZ) {
+				[self printString: "@"];
+				[self error: "too many arguments" code: 255];
+				return NULL;
+			}
+			new = &argbuf[i++];
 			new->arg = wp[1];
 			new->next = argdef;
 			new->prev = argdef->prev;
 			argdef->prev->next = new;
 			argdef->prev = new;
 		}
-	if(len == 0)
-		return strcpy(malloc(strlen(word[0]) + 1), word[0]);
-	sel = malloc(len + 1);
-	cur = sel;
+	if(len == 0) {
+		if(strlen(word[0]) >= sizeof msg) {
+			[self printString: "@"];
+			[self error: ERR_LONGMSG code: 255];
+			return NULL;
+		}
+		return strcpy(msg, word[0]);
+	}
+	cur = msg;
 	for(wp = word; *wp; wp++)
 		if([self lastCharacter: *wp] == ':') {
 			len = strlen(*wp);
@@ -144,7 +152,7 @@
 			cur += len;
 		}
 	*cur = '\0';
-	return sel;
+	return msg;
 }
 
 - (void) execute: (char *) f tree: (struct Tree *) at
