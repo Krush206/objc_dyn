@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "objc_dyn.h"
+#import "sh.h"
 
 @implementation Shell (Semantic)
 - (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
@@ -59,7 +59,6 @@
 			if(msg == NULL)
 				break;
 			[self execute: self message: msg];
-			free(msg);
 			break;
 		}
 		if([self equalString: cp1 to: "="]) {
