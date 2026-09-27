@@ -41,7 +41,7 @@ static char subchar = '$';
 	register char c, c1;
 	register int dolflag;
 
-	*argp++ = linep;
+	*(*argp)++ = *linep;
 
 loop:
 	switch(c = [self getCharacter: DOLREPL]) {
@@ -53,31 +53,31 @@ loop:
 	case '\'':	/* '...' : what you see is what you get */
 	case '"':	/* "..." : \", \$, $ substitution */
 		c1 = c;
-		dolflag = (c == '"' && !dolp) ? DOLREPQ : !DOLREPL;
+		dolflag = (c == '"' && !*dolp) ? DOLREPQ : !DOLREPL;
 		while((c=[self getCharacter: dolflag]) != c1) {
 			if(c == '\n') {
-				error++;
-				peekc = c;
+				(*error)++;
+				*peekc = c;
 				return;
 			}
 			if (c1 == '"' &&
 			    c == '\\' &&
-			    ((peekc = [self getCharacter: !DOLREPL]) == '$' ||
-			     peekc == '"')) {
-				c = peekc;
-				peekc = 0;
+			    ((*peekc = [self getCharacter: !DOLREPL]) == '$' ||
+			     *peekc == '"')) {
+				c = *peekc;
+				*peekc = 0;
 			}
-			*linep++ = c|QUOTE;
+			*(*linep)++ = c|QUOTE;
 		}
 		goto pack;
 
 	case '&':
 	case '|':
-		*linep++ = c;
-		if((peekc=[self getCharacter: DOLREPL]) == c)
-			peekc = 0;
+		*(*linep)++ = c;
+		if((*peekc=[self getCharacter: DOLREPL]) == c)
+			*peekc = 0;
 		else
-			linep--;
+			(*linep)--;
 	case ';':
 	case '<':
 	case '>':
@@ -85,8 +85,8 @@ loop:
 	case ')':
 	case '^':
 	case '\n':
-		*linep++ = c;
-		*linep++ = '\0';
+		*(*linep)++ = c;
+		*(*linep)++ = '\0';
 		return;
 	case '\\':
 		if ((c=[self getCharacter: !DOLREPL])=='\n') goto loop;
@@ -96,7 +96,7 @@ loop:
 		}
 	}
 
-	peekc = c;
+	*peekc = c;
 
 pack:
 	for(;;) {
@@ -105,15 +105,15 @@ pack:
 			else c |= QUOTE;
 		}
 		if([self anyCharacter: c in: " '\"\t;&<>()|^\n:"]) {
-			peekc = c;
+			*peekc = c;
 			if([self anyCharacter: c in: "\"'"])
 				goto loop;
 			if(c == ':')
-				*linep++ = [self getCharacter: !DOLREPL];
-			*linep++ = '\0';
+				*(*linep)++ = [self getCharacter: !DOLREPL];
+			*(*linep)++ = '\0';
 			return;
 		}
-		*linep++ = c;
+		*(*linep)++ = c;
 	}
 }
 
@@ -142,61 +142,61 @@ null:
 {
 	register char c;
 
-	if(peekc) {
-		c = peekc;
-		peekc = 0;
+	if(*peekc) {
+		c = *peekc;
+		*peekc = 0;
 		return(c);
 	}
-	if(argp > eargp) {
-		argp -= 10;
+	if(*argp > *eargp) {
+		*argp -= 10;
 		while((c=[self getCharacter: !DOLREPL]) != '\n');
-		argp += 10;
+		*argp += 10;
 		[self error: ERR_ARGS code: 255];
-		gflg++;
+		(*gflg)++;
 		return(c);
 	}
-	if(linep > elinep) {
-		linep -= 10;
+	if(*linep > *elinep) {
+		*linep -= 10;
 		while((c=[self getCharacter: !DOLREPL]) != '\n');
-		linep += 10;
+		*linep += 10;
 		[self error: ERR_CHAR code: 255];
-		gflg++;
+		(*gflg)++;
 		return(c);
 	}
 getd:
-	if(dolp) {
-		if ((c = *dolp++)) {
+	if(*dolp) {
+		if ((c = *(*dolp)++)) {
 			if (flag == DOLREPQ)
 				c |= QUOTE;
 			return c;
 		}
-		if (idolp && ++idolp < dolc) {
-			dolp = dolv[idolp];
+		if (*idolp && ++(*idolp) < *dolc) {
+			*dolp = (*dolv)[*idolp];
 			return(' ');
 		}
-		dolp = 0;
+		*dolp = 0;
 	}
 	c = [self readCharacter];
 	if(c == subchar && flag) {
 		c = [self readCharacter];
 		if(c>='0' && c<='9') {
-			if(c-'0' < dolc)
-				dolp = dolv[c-'0'];
+			if(c-'0' < *dolc)
+				*dolp = (*dolv)[c-'0'];
 			goto getd;
 		}
 		else if(c>='a' && c<='z') {
-			dolp = seta[c-'a'];
+			*dolp = seta[c-'a'];
 			goto getd;
 		}
 		else if(c == '$') {
-			dolp = pidp;
+			*dolp = pidp;
 			goto getd;
 		}
 		/* $* = $1 $2 .... */
 		else if (c == '*') {
-			if (dolc > 1) {
-				idolp = 1;
-				dolp = dolv[1];
+			if (*dolc > 1) {
+				*idolp = 1;
+				**dolp = (*dolp)[1];
 			}
 			goto getd;
 		}
@@ -212,23 +212,23 @@ getd:
 	char cc;
 	register int c;
 
-	if (arginp) {
-		if (*arginp == 1)
-			exit(errval);
-		if ((c = *arginp++) == 0) {
-			*arginp = 1;
+	if (*arginp) {
+		if (**arginp == 1)
+			exit(*errval);
+		if ((c = *(*arginp)++) == 0) {
+			**arginp = 1;
 			c = '\n';
 		}
 		return(c);
 	}
-	if (onelflg==1)
+	if (*onelflg==1)
 		exit(255);
 	if((rdstat = read(0, &cc, 1)) != 1) {
-		if(rdstat==0) exit(errval); /* end of file*/
+		if(rdstat==0) exit(*errval); /* end of file*/
 		else exit(255); /* error */
 	}
-	if (cc=='\n' && onelflg)
-		onelflg--;
+	if (cc=='\n' && *onelflg)
+		(*onelflg)--;
 	return(cc);
 }
 @end
