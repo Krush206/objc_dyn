@@ -87,7 +87,7 @@
 {
 	[self printString: s];
 	[self printString: "\n"];
-	if(promp == NULL) {
+	if(*promp == NULL) {
 		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
@@ -121,7 +121,7 @@
 - (int) glob: (int) c
 {
 	if([self anyCharacter: c in: "[?*"])
-		gflg = 1;
+		*gflg = 1;
 	return(c);
 }
 
@@ -226,5 +226,159 @@
 - (void) setFunction: (id) ptr
 {
 	func = ptr;
+}
+
+- (int *) getTreeCount
+{
+	static int ret;
+
+	return treec = &ret;
+}
+
+- (int *) getErrorValue
+{
+	static int ret;
+
+	return errval = &ret;
+}
+
+- (int *) getCurrentDollarPointer
+{
+	static int ret;
+
+	return idolp = &ret;
+}
+
+- (char **) getDollarPointer
+{
+	static char *ret;
+
+	return dolp = &ret;
+}
+
+- (char ***) getDollarVector
+{
+	static char **ret;
+
+	return dolv = &ret;
+}
+
+- (int *) getDollarCount
+{
+	static int ret;
+
+	return dolc = &ret;
+}
+
+- (char **) getPrompt
+{
+	static char *ret;
+
+	return promp = &ret;
+}
+
+- (char **) getLinePointer
+{
+	static char *ret;
+
+	return linep = &ret;
+}
+
+- (char **) getEndLinePointer
+{
+	static char *ret;
+
+	return elinep = &ret;
+}
+
+- (char ***) getArgumentPointer
+{
+	static char **ret;
+
+	return argp = &ret;
+}
+
+- (char ***) getEndArgumentPointer
+{
+	static char **ret;
+
+	return eargp = &ret;
+}
+
+- (int *) getPeekCharacter
+{
+	static int ret;
+
+	return peekc = &ret;
+}
+
+- (int *) getGlobFlag
+{
+	static int ret;
+
+	return gflg = &ret;
+}
+
+- (int *) getError
+{
+	static int ret;
+
+	return error = &ret;
+}
+
+- (int *) getUserID
+{
+	static int ret;
+
+	return uid = &ret;
+}
+
+- (int *) getSetInterrupt
+{
+	static int ret;
+
+	return setintr = &ret;
+}
+
+- (char **) getArgumentInput
+{
+	static char *ret;
+
+	return arginp = &ret;
+}
+
+- (int *) getOneLineFlag
+{
+	static int ret;
+
+	return onelflg = &ret;
+}
+
+- (int *) getStopError
+{
+	static int ret;
+
+	return stoperr = &ret;
+}
+
+- (int *) getExecuteFlag
+{
+	static int ret;
+
+	return execflg = &ret;
+}
+
+- (jmp_buf *) getJumpBuffer
+{
+	static jmp_buf ret;
+
+	return jmp = &ret;
+}
+
+- (struct Argument *) getArgumentDefinition
+{
+	static struct Argument ret;
+
+	return argdef = &ret;
 }
 @end
