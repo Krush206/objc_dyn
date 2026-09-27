@@ -98,7 +98,7 @@
 	}
 	if(l == 0)
 		return [self syn2: p1 end: p2];
-	error++;
+	(*error)++;
 	return(0);
 }
 
@@ -168,7 +168,7 @@
 	case '(':
 		if(l == 0) {
 			if(lp != 0)
-				error++;
+				(*error)++;
 			lp = p+1;
 		}
 		l++;
@@ -190,19 +190,19 @@
 		if(l == 0) {
 			p++;
 			if(p == p2) {
-				error++;
+				(*error)++;
 				p--;
 			}
 			if([self anyCharacter: **p in: "<>("])
-				error++;
+				(*error)++;
 			if(c == '<') {
 				if(i != 0)
-					error++;
+					(*error)++;
 				i = *p;
 				continue;
 			}
 			if(o != 0)
-				error++;
+				(*error)++;
 			o = *p;
 		}
 		continue;
@@ -213,14 +213,14 @@
 	}
 	if(lp != 0) {
 		if(n != 0)
-			error++;
+			(*error)++;
 		t = [self tree];
 		t->DTYP = TPAR;
 		t->DSTR = [self syn1: lp end: rp];
 		goto out;
 	}
 	if(n == 0)
-		error++;
+		(*error)++;
 	p1[n++] = 0;
 	t = [self tree];
 	t->DTYP = TCOM;
@@ -235,11 +235,11 @@ out:
 
 - (struct Tree *) tree
 {
-	if(treec == TRESIZ) {
+	if(*treec == TRESIZ) {
 		[self printString: "Command line overflow\n"];
-		error++;
-		longjmp(jmp, 1);
+		(*error)++;
+		longjmp(*jmp, 1);
 	}
-	return(&trebuf[treec++]);
+	return(&trebuf[(*treec)++]);
 }
 @end
