@@ -67,11 +67,6 @@ struct Builtin {
 	SEL bfunc;
 };
 
-struct Pack {
-	struct Builtin *ptr;
-	size_t count;
-};
-
 struct Argument {
 	const char *arg;
 	struct Argument *next;
@@ -99,28 +94,10 @@ struct Tree {
 	} t_dcom;
 };
 
-extern int treec;
-extern int errval;
-extern int idolp;
-extern char *dolp;
-extern char **dolv;
-extern int dolc;
-extern char *promp;
-extern char *linep;
-extern char *elinep;
-extern char **argp;
-extern char **eargp;
-extern int peekc;
-extern int gflg;
-extern int error;
-extern int uid;
-extern int setintr;
-extern char *arginp;
-extern int onelflg;
-extern int stoperr;
-extern int execflg;
-extern jmp_buf jmp;
-extern struct Argument *argdef;
+struct Pack {
+	struct Builtin *ptr;
+	size_t count;
+};
 
 @interface Shell: Object
 {
@@ -133,6 +110,28 @@ extern struct Argument *argdef;
 	char pidp[NUMSIZ];
 	struct Tree trebuf[TRESIZ];
 	struct Argument argbuf[LSTSIZ];
+	int *treec;
+	int *errval;
+	int *idolp;
+	char **dolp;
+	char ***dolv;
+	int *dolc;
+	char **promp;
+	char **linep;
+	char **elinep;
+	char ***argp;
+	char ***eargp;
+	int *peekc;
+	int *gflg;
+	int *error;
+	int *uid;
+	int *setintr;
+	char **arginp;
+	int *onelflg;
+	int *stoperr;
+	int *execflg;
+	jmp_buf *jmp;
+	struct Argument *argdef;
 }
 + (int) argumentCount: (int) c argumentVector: (char *[]) av;
 - (void) main;
@@ -195,15 +194,37 @@ extern struct Argument *argdef;
 - (void) setSetASCII: (char (*)[]) ptr;
 - (id) getFunction;
 - (void) setFunction: (id) ptr;
+- (int *) getTreeCount;
+- (int *) getErrorValue;
+- (int *) getCurrentDollarPointer;
+- (char **) getDollarPointer;
+- (char ***) getDollarVector;
+- (int *) getDollarCount;
+- (char **) getPrompt;
+- (char **) getLinePointer;
+- (char **) getEndLinePointer;
+- (char ***) getArgumentPointer;
+- (char ***) getEndArgumentPointer;
+- (int *) getPeekCharacter;
+- (int *) getGlobFlag;
+- (int *) getError;
+- (int *) getUserID;
+- (int *) getSetInterrupt;
+- (char **) getArgumentInput;
+- (int *) getOneLineFlag;
+- (int *) getStopError;
+- (int *) getExecuteFlag;
+- (jmp_buf *) getJumpBuffer;
+- (struct Argument *) getArgumentDefinition;
 @end
 
 @interface Function: Object
 {
 @private
 	id sh;
-	struct Pack pack;
 }
 + (id) new;
+- (struct Pack *) getBuiltin;
 - (int) scan: (struct Tree *) t;
 - (void) dozip: (struct Tree *) t;
 - (void) doset: (struct Tree *) t;
@@ -213,8 +234,6 @@ extern struct Argument *argdef;
 - (void) donewgrp: (struct Tree *) t;
 - (void) doshift: (struct Tree *) t;
 - (void) dowait: (struct Tree *) t;
-- (struct Pack *) getPack;
-- (void) setPack: (struct Pack *) ptr;
 - (id) getShell;
 - (void) setShell: (id) ptr;
 @end
