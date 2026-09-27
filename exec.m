@@ -34,7 +34,7 @@
 #import "sh.h"
 
 @implementation Shell (Execute)
-- (id) execute: (id) obj message: (const char *) msg
+- (id) execute: (id) obj message: (const char *) message
 {
 	int i;
 	register SEL sel;
@@ -47,7 +47,7 @@
 	i = 0;
 	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
 		arr[i++] = [self getObject: argnew->arg];
-	sel = sel_register_name(msg);
+	sel = sel_register_name(message);
 	cls = object_get_class(obj);
 	met = class_get_instance_method(cls, sel);
 	if(met == METHOD_NULL) {
