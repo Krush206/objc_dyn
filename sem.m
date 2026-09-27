@@ -116,7 +116,7 @@ f1:
 			close(0);
 			open("/dev/null", 0);
 		}
-		if((f&FINT) == 0 && setintr) {
+		if((f&FINT) == 0 && *setintr) {
 			signal(SIGINT, SIG_IGN);
 			signal(SIGQUIT, SIG_IGN);
 		}
@@ -126,9 +126,9 @@ f1:
 			[self execute: t input: pf1 output: pf2];
 			exit(255);
 		}
-		gflg = 0;
+		*gflg = 0;
 		[self scan: t selector: @selector(glob:)];
-		if(gflg) {
+		if(*gflg) {
 			t->DARR[0] = "/etc/glob";
 			t->DARR[1] = NULL;
 			execv(t->DARR[0], t->DARR);
@@ -136,7 +136,7 @@ f1:
 			exit(255);
 		}
 		[self scan: t selector: @selector(trim:)];
-		*linep = 0;
+		**linep = 0;
 		[self execute: t->DARR[0] tree: t];
 		[self printString: t->DARR[0]];
 		[self error: ERR_FOUND code: 255];
