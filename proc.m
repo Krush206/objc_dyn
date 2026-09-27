@@ -45,8 +45,8 @@
 		if(p == -1)
 			break;
 		if(WIFEXITED(s)) {
-			errval |= WEXITSTATUS(s);
-			if(WEXITSTATUS(s) && stoperr)
+			*errval |= WEXITSTATUS(s);
+			if(WEXITSTATUS(s) && *stoperr)
 				[self error: "" code: WEXITSTATUS(s)];
 			continue;
 		}
@@ -67,7 +67,7 @@
 		if(WCOREDUMP(s))
 			[self printString: " -- Core dumped"];
 		[self error: "" code: e];
-		errval |= e;
+		*errval |= e;
 	}
 }
 @end
