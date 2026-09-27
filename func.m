@@ -34,10 +34,8 @@
 #import "sh.h"
 
 @implementation Function
-+ (id) new
+- (struct Pack *) getBuiltin
 {
-	id obj;
-	struct Pack pack;
 	static struct Builtin bin[] = { { ":", @selector(dozip:) },
 					{ "=", @selector(doset:) },
 					{ "@", @selector(doobj:) },
@@ -46,12 +44,9 @@
 					{ "newgrp", @selector(donewgrp:) },
 					{ "shift", @selector(doshift:) },
 					{ "wait", @selector(dowait:) } };
+	static struct Pack pack = { bin, sizeof bin / sizeof *bin };
 
-	pack.ptr = bin;
-	pack.count = sizeof bin / sizeof *bin;
-	obj = class_create_instance(self);
-	[obj setPack: &pack];
-	return obj;
+	return &pack;
 }
 
 - (int) scan: (struct Tree *) t
@@ -62,9 +57,9 @@
 	void *imp;
 	struct Builtin *bp;
 
-	bp = pack.ptr;
+	bp = [self getBuiltin]->ptr;
 	first = 0;
-	last = pack.count - 1;
+	last = [self getBuiltin]->count - 1;
 	while(first <= last) {
 		middle = first + (last - first) / 2;
 		compare = strcmp(t->DARR[0], bp[middle].bname);
@@ -116,7 +111,7 @@
 	msg = [sh buildArguments: &t->DARR[1]];
 	if(msg == NULL)
 		return;
-	[sh execute: self message: msg];
+	[sh execute: sh message: msg];
 }
 
 - (void) dochdir: (struct Tree *) t
@@ -134,14 +129,14 @@
 
 - (void) dologin: (struct Tree *) t
 {
-	if(promp)
+	if(*[sh getPrompt])
 		execv("/bin/login", t->DARR);
 	[sh printString: "login: cannot execute\n"];
 }
 
 - (void) donewgrp: (struct Tree *) t
 {
-	if(promp)
+	if(*[sh getPrompt])
 		execv("/bin/newgrp", t->DARR);
 	[sh printString: "newgrp: cannot execute\n"];
 }
@@ -149,29 +144,19 @@
 - (void) doshift: (struct Tree *) t
 {
 	(void) t;
-	if(dolc < 1) {
+	if(*[sh getDollarCount] < 1) {
 		[sh printString: "shift: no args\n"];
 		return;
 	}
-	dolv[1] = dolv[0];
-	dolv++;
-	dolc--;
+	(*[sh getDollarVector])[1] = (*[sh getDollarVector])[0];
+	(*[sh getDollarVector])++;
+	(*[sh getDollarCount])--;
 }
 
 - (void) dowait: (struct Tree *) t
 {
 	(void) t;
 	[sh wait: -1];
-}
-
-- (struct Pack *) getPack
-{
-	return &pack;
-}
-
-- (void) setPack: (struct Pack *) ptr
-{
-	(void) memcpy(&pack, ptr, sizeof pack);
 }
 
 - (id) getShell
