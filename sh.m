@@ -33,29 +33,6 @@
 
 #import "sh.h"
 
-int treec;
-int errval;
-int idolp;
-char *dolp;
-char **dolv;
-int dolc;
-char *promp;
-char *linep;
-char *elinep;
-char **argp;
-char **eargp;
-int peekc;
-int gflg;
-int error;
-int uid;
-int setintr;
-char *arginp;
-int onelflg;
-int stoperr;
-int execflg;
-jmp_buf jmp;
-struct Argument *argdef;
-
 int
 main(int c, char *av[])
 {
@@ -71,32 +48,53 @@ main(int c, char *av[])
 	int f;
 
 	sh = class_create_instance(self);
+	(void) [sh getTreeCount];
+	(void) [sh getErrorValue];
+	(void) [sh getCurrentDollarPointer];
+	(void) [sh getDollarPointer];
+	(void) [sh getDollarVector];
+	(void) [sh getDollarCount];
+	(void) [sh getPrompt];
+	(void) [sh getLinePointer];
+	(void) [sh getEndLinePointer];
+	(void) [sh getArgumentPointer];
+	(void) [sh getEndArgumentPointer];
+	(void) [sh getPeekCharacter];
+	(void) [sh getGlobFlag];
+	(void) [sh getError];
+	(void) [sh getUserID];
+	(void) [sh getSetInterrupt];
+	(void) [sh getArgumentInput];
+	(void) [sh getOneLineFlag];
+	(void) [sh getStopError];
+	(void) [sh getExecuteFlag];
+	(void) [sh getJumpBuffer];
 	(void) strcpy([sh getPIDPointer], [sh integerToASCII: getpid()]);
 	[sh setFunction: obj = [Function new]];
 	[obj setShell: sh];
 	v = av;
-	promp = "% ";
+	*[sh getPrompt] = "% ";
 	if(getuid() == 0)
-		promp = "# ";
+		*[sh getPrompt] = "# ";
 	if(!isatty(0))
-		promp = NULL;
-	stoperr = 0;
+		*[sh getPrompt] = NULL;
+	*[sh getStopError] = 0;
 	if(c>1 && v[1][0]=='-' && v[1][1]=='e') {
-		++stoperr;
+		++(*[sh getStopError]);
 		v[1] = v[0];
 		++v;
 		--c;
 	}
-	arginp = NULL;
-	execflg = onelflg = 0;
+	*[sh getArgumentInput] = NULL;
+	*[sh getExecuteFlag] = *[sh getOneLineFlag] = 0;
 	if(c > 1) {
-		promp = NULL;
+		*[sh getPrompt] = NULL;
 		if (*v[1]=='-') {
-			execflg = 1;
+			*[sh getExecuteFlag] = 1;
 			if (v[1][1]=='c' && c>2)
-				arginp = v[2];
+				*[sh getArgumentInput] = v[2];
 			else if (v[1][1]=='t')
-				onelflg = 2;
+				*[sh getOneLineFlag] = 2;
 		} else {
 			close(0);
 			f = open(v[1], 0);
@@ -106,19 +104,19 @@ main(int c, char *av[])
 			}
 		}
 	}
-	setintr = 0;
-	if(execflg) {
+	*[sh getSetInterrupt] = 0;
+	if(*[sh getExecuteFlag]) {
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGINT, SIG_DFL);
-		if (arginp==NULL&&onelflg==0)
-			setintr++;
+		if (*[sh getArgumentInput]==NULL&&*[sh getOneLineFlag]==0)
+			(*[sh getSetInterrupt])++;
 	}
-	dolv = v;
-	dolc = c;
+	*[sh getDollarVector] = v;
+	*[sh getDollarCount] = c;
 loop:
-	if(promp != NULL)
-		[sh printString: promp];
-	peekc = [sh getCharacter: !DOLREPL];
+	if(*[sh getPrompt] != NULL)
+		[sh printString: *[sh getPrompt]];
+	*[sh getPeekCharacter] = [sh getCharacter: !DOLREPL];
 	[sh main];
 	goto loop;
 	object_dispose(sh);
@@ -133,25 +131,25 @@ loop:
 	argdef = argbuf;
 	argdef->next = argdef;
 	argdef->prev = argdef;
-	argp = args;
-	eargp = args+ARGSIZ-1;
-	linep = line;
-	elinep = line+LINSIZ-1;
-	error = 0;
-	gflg = 0;
+	*argp = args;
+	*eargp = args+ARGSIZ-1;
+	*linep = line;
+	*elinep = line+LINSIZ-1;
+	*error = 0;
+	*gflg = 0;
 	do {
-		cp = linep;
+		cp = *linep;
 		[self word];
 	} while(*cp != '\n');
-	treec = 0;
-	if(gflg == 0) {
-		if(error == 0) {
-			setjmp(jmp);
-			if (error)
+	*treec = 0;
+	if(*gflg == 0) {
+		if(*error == 0) {
+			setjmp(*jmp);
+			if (*error)
 				return;
-			t = [self syntax: args end: argp];
+			t = [self syntax: args end: *argp];
 		}
-		if(error != 0)
+		if(*error != 0)
 			[self error: ERR_SYNTAX code: 255]; else
 			[self execute: t input: NULL output: NULL];
 	}
