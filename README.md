@@ -56,8 +56,10 @@ metacharacters.
 
 The original goal of this project, achieved without a compiler: method
 bodies are JSON programs — arrays of message sends — interpreted by the
-shell's gateway. Within a body, `$self` is the receiving instance and
-`$arg:0` … are its arguments.
+shell's gateway. Within a body, `$self` is the receiving instance (as a
+receiver, or as its ref name in argument position) and `$arg:0` … are its
+arguments (as a receiver, an argument is a ref string; in argument
+position the whole JSON value is substituted).
 
 	{"id":"a","receiver":"$shell","selector":"defineClass:","arguments":["Greet","Object"]}
 	{"id":"b","receiver":"$shell","selector":"defineMethod:","arguments":["Greet","say:",
