@@ -270,6 +270,9 @@ static struct UserMethod *findMethod(struct UserClass *c, const char *name)
 {
 	id result = nil;
 	size_t i;
+	struct JVal selfstore;
+	char selfbuf[64];
+	int haveself = 0;
 
 	if(prog == NULL || prog->type != JARR)
 	{
@@ -297,6 +300,18 @@ static struct UserMethod *findMethod(struct UserClass *c, const char *name)
 		}
 		if(strcmp(rj->string, "$self") == 0)
 			recv = selfobj;
+		else if(strncmp(rj->string, "$arg:", 5) == 0 &&
+			rj->string[5] >= '0' && rj->string[5] <= '9')
+		{
+			struct JVal *av = llm_arg(args, atoi(rj->string + 5));
+
+			if(av == NULL || av->type != JSTR)
+			{
+				[self setErr: ERR_ARGS];
+				return nil;
+			}
+			recv = [self resolve: av->string];
+		}
 		else
 			recv = [self resolve: rj->string];
 		if(recv == nil)
@@ -305,6 +320,38 @@ static struct UserMethod *findMethod(struct UserClass *c, const char *name)
 			return nil;
 		}
 		alist = [self makeArguments: jget(step, "arguments")];
+		{
+			struct Argument *n;
+
+			for(n = alist->next; n != alist; n = n->next)
+				if(n->val != NULL && n->val->type == JSTR)
+				{
+					if(args != NULL &&
+					   strncmp(n->val->string, "$arg:", 5) == 0 &&
+					   n->val->string[5] >= '0' &&
+					   n->val->string[5] <= '9')
+					{
+						struct JVal *av = llm_arg(args, atoi(n->val->string + 5));
+
+						if(av != NULL)
+							n->val = av;
+					}
+					else if(selfobj != nil &&
+						strcmp(n->val->string, "$self") == 0 &&
+						refOf(selfobj) != NULL)
+					{
+						if(!haveself)
+						{
+							memset(&selfstore, 0, sizeof selfstore);
+							selfstore.type = JSTR;
+							selfstore.string = selfbuf;
+							snprintf(selfbuf, sizeof selfbuf, "%s", refOf(selfobj));
+							haveself = 1;
+						}
+						n->val = &selfstore;
+					}
+				}
+		}
 		result = [self dispatch: recv selector: sj->string
 			arguments: alist depth: depth + 1];
 		[self freeArguments: alist];
