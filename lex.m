@@ -78,6 +78,20 @@ loop:
 			*peekc = 0;
 		else
 			(*linep)--;
+	/* Smalltalk assignment operator ':=', symbol '#', selector ':' */
+	case ':':
+	if ((c=[self getCharacter: DOLREPL]) == '=') {
+		*(*linep)++ = ':';
+		*(*linep)++ = c;
+		*(*linep)++ = '\0';
+		return;
+	}
+	/* put back the character and fall through */
+	(*linep)--;
+	case '#':
+		*(*linep)++ = c;
+		*(*linep)++ = '\0';
+	return;
 	case ';':
 	case '<':
 	case '>':
