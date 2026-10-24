@@ -1,5 +1,6 @@
 #ifndef OBJC_DYN
 #define OBJC_DYN 1
+
 #import <stdlib.h>
 #import <string.h>
 #import <stdio.h>
@@ -59,7 +60,6 @@
 /* Smalltalk syntax tokens */
 #define TOK_ASSIGN  0x8000  /* := */
 #define TOK_SYMBOL  0x8001  /* #symbol */
-#define TOK_CASCADE 0x8002  /* ; */
 
 struct ClassList {
 	Class cls;
@@ -92,7 +92,7 @@ struct Symbol {
 };
 
 struct ArgumentList {
-	const char *arg;
+	id arg;
 	struct ArgumentList *next;
 	struct ArgumentList *prev;
 };
@@ -118,29 +118,38 @@ struct Tree {
 	} t_dcom;
 };
 
-extern char *promp;
-extern char *linep;
-extern char *elinep;
-extern char **argp;
-extern char **eargp;
-extern int peekc;
-extern int gflg;
-extern int error;
-extern int dolc;
-extern int idolp;
-extern char pidp[NUMSIZ];
-extern char *dolp;
-extern char **dolv;
-extern char seta[][EXPSIZ];
-extern int treec;
-extern char line[LINSIZ];
-extern char *args[ARGSIZ];
-extern struct Tree trebuf[TRESIZ];
-extern jmp_buf jmp;
-extern struct ObjectList objdef;
-extern struct ArgumentList argdef;
-
+/* Shell instance variables - all shell state moved from globals to ivars */
 @interface Shell: Object
+{
+@private
+	char *promp;
+	char *linep;
+	char *elinep;
+	char **argp;
+	char **eargp;
+	int peekc;
+	int gflg;
+	int error;
+	char line[LINSIZ];
+	char *args[ARGSIZ];
+	char pidp[NUMSIZ];
+	char seta[26][EXPSIZ];
+	char *dolp;
+	int dolc;
+	char **dolv;
+	int idolp;
+	int treec;
+	jmp_buf jmp;
+	struct ObjectList objdef;
+	struct ArgumentList argdef;
+	struct ClassList clsdef;
+	struct RootList rootdef;
+	char *clsroot;
+	char subchar;
+	char ungetc_buf;
+	int output_done;
+}
+
 + (int) argc: (int) c argv: (char *[]) av;
 - (id) execute: (id) obj message: (const char *) msg;
 - (char *) buildArguments: (char **) line;
@@ -173,6 +182,11 @@ extern struct ArgumentList argdef;
 - (int) trim: (int) c;
 - (char *) integerToASCII: (int) n;
 - (id) describeObject: (id) obj;
+/* Variable assignment and lookup */
+- (id) setVariable: (const char *) name value: (id) val;
+- (id) getVariable: (const char *) name;
+/* Symbol support */
+- (id) internSymbol: (const char *) name;
 @end
 
 @interface Shell (Runtime)
@@ -191,11 +205,6 @@ extern struct ArgumentList argdef;
 - (struct ArgumentList *) getArgumentList;
 - (void) freeArgument: (struct ArgumentList *) argnew;
 - (void) resolveLinks;
-/* Variable assignment and lookup */
-- (id) setVariable: (const char *) name value: (id) val;
-- (id) getVariable: (const char *) name;
-/* Symbol support */
-- (id) internSymbol: (const char *) name;
 @end
 
 @interface Shell (Lexer)
