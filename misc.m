@@ -5,14 +5,14 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code and documentation must retain the above
- *    copyright notice, this list of conditions and the following disclaimer.
+ *    copyright notice, this list of conditions and this disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
+ *    notice, this list of conditions and this disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *      This product includes software developed or owned by Caldera
- *      International, Inc.
+ *    International, Inc.
  * 4. Neither the name of Caldera International, Inc. nor the names of other
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
@@ -33,20 +33,17 @@
 
 #import "objc_dyn.h"
 
-static char subchar = '$';
-static char ungetc_buf = 0;
-
 @implementation Shell (Miscellaneous)
 - (int) readCharacter
 {
-	int rdstat, c;
+	int rdstat;
 	char cc;
 
 	if((rdstat = read(0, &cc, (size_t) 1)) != 1) {
-		if(rdstat==0) exit(0); /* end of file*/
+		if(rdstat == 0) exit(0); /* end of file */
 		else exit(255); /* error */
 	}
-	return(c = cc);
+	return(cc);
 }
 
 - (void) printString: (const char *) as
@@ -70,9 +67,9 @@ static char ungetc_buf = 0;
 {
 	register int a;
 
-	if ((a = n/10))
+	if ((a = n / 10))
 		[self printNumber: a];
-	[self putCharacter: n%10 + '0'];
+	[self putCharacter: n % 10 + '0'];
 }
 
 - (int) anyCharacter: (int) c in: (const char *) as
@@ -102,7 +99,7 @@ static char ungetc_buf = 0;
 {
 	[self printString: s];
 	[self printString: "\n"];
-	if(promp == NULL) {
+	if(self->promp == NULL) {
 		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
@@ -120,91 +117,92 @@ static char ungetc_buf = 0;
 	return c = cp[0];
 }
 
-/*	flag: !DOLREPL ==> no substitution, DOLREPL ==> substitute,
-	DOLREPQ ==> quoted substitution: "$1" = value of $1 for sure */
 - (int) getCharacter: (int) flag
 {
 	register char c;
 
-	if(peekc) {
-		c = peekc;
-		peekc = 0;
+	if(self->peekc) {
+		c = self->peekc;
+		self->peekc = 0;
 		return(c);
 	}
 
-	/* Support ungetCharacter via peekc */
-	if(ungetc_buf) {
-		c = ungetc_buf;
-		ungetc_buf = 0;
+	/* Support ungetCharacter via ungetc_buf */
+	if(self->ungetc_buf) {
+		c = self->ungetc_buf;
+		self->ungetc_buf = 0;
 		return(c);
 	}
-	if(argp > eargp) {
-		argp -= 10;
-		while((c=[self getCharacter: !DOLREPL]) != '\n');
-		argp += 10;
+
+	if(self->argp > self->eargp) {
+		self->argp -= 10;
+		while((c = [self getCharacter: !DOLREPL]) != '\n');
+		self->argp += 10;
 		[self error: ERR_ARGS code: 255];
-		gflg++;
+		self->gflg++;
 		return(c);
 	}
-	if(linep > elinep) {
-		linep -= 10;
-		while((c=[self getCharacter: !DOLREPL]) != '\n');
-		linep += 10;
+	if(self->linep > self->elinep) {
+		self->linep -= 10;
+		while((c = [self getCharacter: !DOLREPL]) != '\n');
+		self->linep += 10;
 		[self error: ERR_CHAR code: 255];
-		gflg++;
+		self->gflg++;
 		return(c);
 	}
 getd:
-	if(dolp) {
-		if (c = *dolp++) {
+	if(self->dolp) {
+		if (c = *self->dolp++) {
 			if (flag == DOLREPQ)
 				c |= QUOTE;
 			return c;
 		}
-		if (idolp && ++idolp < dolc) {
-			dolp = dolv[idolp];
+		if (self->idolp && ++self->idolp < self->dolc) {
+			self->dolp = self->dolv[self->idolp];
 			return(' ');
 		}
-		dolp = 0;
+		self->dolp = 0;
 	}
 	c = [self readCharacter];
-	if(c == subchar && flag) {
+	if(c == self->subchar && flag) {
 		c = [self readCharacter];
-		if(c>='0' && c<='9') {
-			if(c-'0' < dolc)
-				dolp = dolv[c-'0'];
+		if(c >= '0' && c <= '9') {
+			if(c - '0' < self->dolc)
+				self->dolp = self->dolv[c - '0'];
 			goto getd;
 		}
-		else if(c>='a' && c<='z') {
-			dolp = seta[c-'a'];
+		else if(c >= 'a' && c <= 'z') {
+			self->dolp = self->seta[c - 'a'];
 			goto getd;
 		}
 		else if(c == '$') {
-			dolp = pidp;
+			self->dolp = self->pidp;
 			goto getd;
 		}
 		/* $* = $1 $2 .... */
 		else if (c == '*') {
-			if (dolc > 1) {
-				idolp = 1;
-				dolp = dolv[1];
+			if (self->dolc > 1) {
+				self->idolp = 1;
+				self->dolp = self->dolv[1];
 			}
 			goto getd;
 		}
 		else
 			if(c != '\n')  c = [self readCharacter];
 	}
-	return(c&0177);
+	return(c & 0177);
 }
 
 - (void) ungetCharacter: (int) c
 {
-	ungetc_buf = c;
+	self->ungetc_buf = c;
 }
 
 - (void) scan: (struct Tree *) at selector: (SEL) sel
 {
-	register char *p, **t, c;
+	register char *p;
+	register char **t;
+	register int c;
 
 	t = at->DARR;
 	while((p = *t++))
@@ -215,13 +213,31 @@ getd:
 - (int) glob: (int) c
 {
 	if([self anyCharacter: c in: "[?*"])
-		gflg = 1;
+		self->gflg = 1;
 	return(c);
 }
 
 - (int) trim: (int) c
 {
-	return(c&0177);
+	return(c & 0177);
+}
+
+- (char *) integerToASCII: (int) n
+{
+	register int j;
+	register char *cp;
+	static char str[NUMSIZ];
+
+	j = n;
+	cp = &str[sizeof str - 1];
+	for (;;) {
+		*cp = j % 10 + '0';
+		j /= 10;
+		if(j == 0)
+			return cp;
+		cp--;
+	}
+	return NULL;
 }
 
 - (id) describeObject: (id) obj
@@ -237,23 +253,5 @@ getd:
 	}
 	[self putCharacter: '\n'];
 	return obj;
-}
-
-- (char *) integerToASCII: (int) n
-{
-	register int i, j;
-	register char *cp;
-	static char str[NUMSIZ];
-
-	j = n;
-	cp = &str[sizeof str - 1];
-	for (;;) {
-		*cp = j % 10 + '0';
-		j /= 10;
-		if(j == 0)
-			return cp;
-		cp--;
-	}
-	return NULL;
 }
 @end
