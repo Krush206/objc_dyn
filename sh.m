@@ -33,6 +33,8 @@
 
 #import "sh.h"
 
+extern void gnustep_register_classes(void);
+
 int
 main(int c, char *av[])
 {
@@ -137,6 +139,10 @@ loop:
 	*elinep = line+LINSIZ-1;
 	*error = 0;
 	*gflg = 0;
+
+	/* Load Objective-C classes (including GNUstep Foundation) */
+	[self loadClass: "Object"];
+	gnustep_register_classes();
 	do {
 		cp = *linep;
 		[self word];
