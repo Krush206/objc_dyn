@@ -5,18 +5,18 @@ LIBOBJC = $(LDIR)/libobjc.so.1
 
 # The classic GNUstep libobjc provides the GNU runtime names used by
 # the sources (objc_next_class, sel_get_uid, ...) natively.
-OBJS = json.o llm.o llmobj.o
+OBJS = sh.o exec.o func.o lex.o misc.o parse.o proc.o sem.o objc_dyn.o
 
-llmsh: $(OBJS)
+sh: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) -lm -Wl,-rpath,$(LDIR) $(LIBOBJC)
 
-%.o: %.m llm.h json.h
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.m sh.h
+	$(CC) $(CFLAGS) -I/usr/local/include/objc -c $< -o $@
 
-test: llmsh
+test: sh
 	sh test.sh
 
 clean:
-	rm -f llmsh json.o llm.o llmobj.o
+	rm -f sh *.o
 
 .PHONY: clean test
