@@ -1,7 +1,7 @@
 #import "objc_dyn.h"
 
-static struct ArgumentList argdef;
-static struct ObjectList objdef;
+struct ArgumentList argdef;
+struct ObjectList objdef;
 static struct ClassList clsdef;
 static struct RootList rootdef;
 
