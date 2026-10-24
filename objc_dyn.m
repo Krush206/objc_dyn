@@ -66,41 +66,23 @@
 
 - (void) loadClass: (const char *) rootname
 {
-	Class cls;
-	struct ClassList *clsnew;
-	struct ClassList *clshead;
-	void *init;
 	static int loaded;
 
 	if(loaded)
 		return;
-	clsnew = &self->clsdef;
-	clsnew->next = clsnew;
-	clsnew->prev = clsnew;
-	clshead = clsnew;
-	init = NULL;
-	[self resolveLinks];
-	while((cls = objc_next_class(&init)) != Nil)
-	{
-		clsnew = malloc(sizeof *clsnew);
-		clsnew->cls = cls;
-		clsnew->name = class_get_class_name(clsnew->cls);
-		clsnew->super = class_get_super_class(clsnew->cls);
-		clsnew->meta = class_get_meta_class(clsnew->cls);
-		clsnew->root = [self getRootClass: clsnew->cls];
-		clsnew->next = &self->clsdef;
-		clsnew->prev = clshead;
-		self->clsdef.prev = clsnew;
-		clshead->next = clsnew;
-		clshead = clsnew;
-	}
+	/* Don't walk all classes via objc_next_class() — that calls
+	 * class_get_super_class() on GNUstep Base metadata which is
+	 * ABI-incompatible with classic libobjc and segfaults.
+	 * Instead, initialize the data structures and let getClass:
+	 * resolve names via objc_lookup_class() on demand. */
+	self->clsdef.next = &self->clsdef;
+	self->clsdef.prev = &self->clsdef;
 	self->argdef.next = &self->argdef;
 	self->argdef.prev = &self->argdef;
 	self->objdef.next = &self->objdef;
 	self->objdef.prev = &self->objdef;
 	self->rootdef.next = &self->rootdef;
 	self->rootdef.prev = &self->rootdef;
-	[self loadRootClass: &self->rootdef class: self->clsdef.next];
 	[self setRootClass: rootname];
 	loaded = 1;
 }
@@ -122,11 +104,16 @@
 {
 	struct ClassList *clsnew;
 
+	/* Check the registry first (for explicitly defined classes) */
 	for(clsnew = self->clsdef.next; clsnew != &self->clsdef; clsnew = clsnew->next)
 		if([self equalString: clsname to: clsnew->name] &&
 		   [self equalString: self->clsroot to: class_get_class_name(clsnew->root)])
 			return clsnew->cls;
-	return Nil;
+
+	/* Fall back to direct runtime lookup via objc_lookup_class()
+	 * — avoids walking objc_next_class() which segfaults with
+	 * GNUstep Base metadata under classic libobjc. */
+	return objc_lookup_class(clsname);
 }
 
 - (id) getObject: (const char *) objname
