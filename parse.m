@@ -83,12 +83,16 @@
 	{
 		if([self equalString: cp1[i] to: ":="])
 		{
-			if(cp1 + i + 1 == end || cp1 + i + 2 > end)
+			/* Find first non-newline token after := */
+			char **after = cp1 + i + 1;
+			while(after < end && **after == '\n')
+				after++;
+			if(after == end)
 			{
 				[self error: "invalid assignment" code: 255];
 				return nil;
 			}
-			return [self assignVariable: cp1[i-1] withValue: [self execute: cp1 + i + 1 count: end]];
+			return [self assignVariable: cp1[i-1] withValue: [self execute: after count: end]];
 		}
 	}
 
@@ -113,8 +117,7 @@
 		ret = [self resolve: *cp1];
 		if(ret != nil)
 			return ret;
-		if(cp1 + 1 >= end)
-			[self error: "missing message" code: 255];
+		[self error: "missing message" code: 255];
 		return nil;
 	}
 
@@ -157,7 +160,7 @@
 		[self error: ": bad message" code: 255];
 		return nil;
 	}
-	imp = objc_msg_lookup(obj, sel);
+	imp = method_get_imp(met);
 	switch(i)
 	{
 	case 0:
@@ -251,14 +254,14 @@
 	return [self selectorLength: av1 + 1 count: end];
 }
 
-- (char *) buildSelector: (char **) words count: (char **) end length: (int) len
+- (char *) buildSelector: (char **) words count: (char **) start length: (int) len
 {
 	register char **av1;
 	register char **av2;
 	register int l;
 
 	av1 = words;
-	av2 = end;
+	av2 = start;
 	l = len;
 	if(av1 == av2)
 	{
@@ -269,8 +272,8 @@
 		return alloc;
 	}
 	if([self lastCharacter: *av1] == ':')
-		return strcat([self buildSelector: av1 - 1 count: end length: l], *av1);
-	return [self buildSelector: av1 - 1 count: end length: l];
+		return strcat([self buildSelector: av1 - 1 count: start length: l], *av1);
+	return [self buildSelector: av1 - 1 count: start length: l];
 }
 
 - (void) main
