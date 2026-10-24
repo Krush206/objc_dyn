@@ -60,6 +60,8 @@
 /* Smalltalk syntax tokens */
 #define TOK_ASSIGN  0x8000  /* := */
 #define TOK_SYMBOL  0x8001  /* #symbol */
+#define TOK_STRING  0x8002  /* "string" */
+#define TOK_WORD    0x8003  /* ordinary word */
 
 struct ClassList {
 	Class cls;
@@ -151,19 +153,7 @@ struct Tree {
 }
 
 + (int) argc: (int) c argv: (char *[]) av;
-- (id) execute: (id) obj message: (const char *) msg;
-- (char *) buildArguments: (char **) line;
-- (void) execute: (char *) f tree: (struct Tree *) at;
-- (void) word;
-- (void) expand: (int) i value: (char *) na;
 - (void) main;
-- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
-- (struct Tree *) syntax: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn1: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn2: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn3: (char **) p1 end: (char **) p2;
-- (struct Tree *) tree;
-- (void) wait: (int) i;
 @end
 
 @interface Shell (Miscellaneous)
@@ -212,14 +202,19 @@ struct Tree {
 - (int) getToken;
 - (int) peekToken;
 - (void) ungetToken: (int) tok;
+- (int) scan: (const char *) name;
 @end
 
 @interface Shell (Parser)
-- (struct Tree *) syntax: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn1: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn2: (char **) p1 end: (char **) p2;
-- (struct Tree *) syn3: (char **) p1 end: (char **) p2;
-- (struct Tree *) tree;
+- (void) main;
+- (id) assignVariable: (const char *) name withValue: (id) newValue;
+- (id) execute: (char **) words count: (char **) end;
+- (id) perform: (id) obj message: (const char *) msg;
+- (id) string: (char **) words count: (char **) end;
+- (void) collectArguments: (char **) words count: (char **) end;
+- (int) selectorLength: (char **) words count: (char **) end;
+- (char *) buildSelector: (char **) words count: (char **) end length: (int) len;
+- (id) resolve: (const char *) name;
 - (id) parseMessage: (char **) p1 end: (char **) p2;
 @end
 #endif /* !OBJC_DYN */
