@@ -31,127 +31,368 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "sh.h"
+#import "objc_dyn.h"
 
-int
-main(int c, char *av[])
+#define LINSIZ 1000
+#define ARGSIZ 50
+
+static void main1(void);
+static void word(void);
+static id execute(char **, char **);
+static id execute1(id, const char *);
+static id assign(char **, char **);
+static void syntax(char **, char **);
+static int syntax1(char **, char **);
+static char *syntax2(char **, char **, int);
+static id string(char **, char **);
+
+char *promp;
+char *linep;
+char *elinep;
+char **argp;
+char **eargp;
+int peekc;
+int gflg;
+int error;
+
+static char line[LINSIZ];
+static char *args[ARGSIZ];
+
+static struct Object *objdef;
+
+static struct Argument *argdef;
+
+int main(void)
 {
-	return [Shell argumentCount: c argumentVector: av];
-}
-
-@implementation Shell
-+ (int) argumentCount: (int) c argumentVector: (char *[]) av
-{
-	register id sh;
-	register char **v;
-	register id obj;
-	int f;
-
-	sh = class_create_instance(self);
-	(void) [sh getTreeCount];
-	(void) [sh getErrorValue];
-	(void) [sh getCurrentDollarPointer];
-	(void) [sh getDollarPointer];
-	(void) [sh getDollarVector];
-	(void) [sh getDollarCount];
-	(void) [sh getPrompt];
-	(void) [sh getLinePointer];
-	(void) [sh getEndLinePointer];
-	(void) [sh getArgumentPointer];
-	(void) [sh getEndArgumentPointer];
-	(void) [sh getPeekCharacter];
-	(void) [sh getGlobFlag];
-	(void) [sh getError];
-	(void) [sh getUserID];
-	(void) [sh getSetInterrupt];
-	(void) [sh getArgumentInput];
-	(void) [sh getOneLineFlag];
-	(void) [sh getStopError];
-	(void) [sh getExecuteFlag];
-	(void) [sh getJumpBuffer];
-	(void) strcpy([sh getPIDPointer], [sh integerToASCII: getpid()]);
-	[sh setFunction: obj = [Function new]];
-	[obj setShell: sh];
-	v = av;
-	*[sh getPrompt] = "% ";
+	loadClass("NSObject");
+	objdef = getObjectList();
+	argdef = getArgumentList();
+	promp = "% ";
 	if(getuid() == 0)
-		*[sh getPrompt] = "# ";
+		promp = "# ";
 	if(!isatty(0))
-		*[sh getPrompt] = NULL;
-	*[sh getStopError] = 0;
-	if(c>1 && v[1][0]=='-' && v[1][1]=='e') {
-		++(*[sh getStopError]);
-		v[1] = v[0];
-		++v;
-		--c;
-	}
-	*[sh getArgumentInput] = NULL;
-	*[sh getExecuteFlag] = *[sh getOneLineFlag] = 0;
-	if(c > 1) {
-		*[sh getPrompt] = NULL;
-		if (*v[1]=='-') {
-			*[sh getExecuteFlag] = 1;
-			if (v[1][1]=='c' && c>2)
-				*[sh getArgumentInput] = v[2];
-			else if (v[1][1]=='t')
-				*[sh getOneLineFlag] = 2;
-		} else {
-			close(0);
-			f = open(v[1], 0);
-			if(f < 0) {
-				[sh printString: v[1]];
-				[sh error: ERR_OPEN code: 255];
-			}
-		}
-	}
-	*[sh getSetInterrupt] = 0;
-	if(*[sh getExecuteFlag]) {
-		signal(SIGQUIT, SIG_DFL);
-		signal(SIGINT, SIG_DFL);
-		if (*[sh getArgumentInput]==NULL&&*[sh getOneLineFlag]==0)
-			(*[sh getSetInterrupt])++;
-	}
-	*[sh getDollarVector] = v;
-	*[sh getDollarCount] = c;
+		promp = NULL;
 loop:
-	if(*[sh getPrompt] != NULL)
-		[sh printString: *[sh getPrompt]];
-	*[sh getPeekCharacter] = [sh getCharacter: !DOLREPL];
-	[sh main];
+	if(promp != NULL)
+		prs(promp);
+	peekc = getc();
+	main1();
 	goto loop;
-	object_dispose(sh);
-	return 0;
 }
 
-- (void) main
+static id assign(char **ap1, char **ap2)
 {
-	register char  *cp;
-	register struct Tree *t;
+	register struct Object *obj;
+	register struct Object *alloc;
+	register char **ap;
 
-	argdef = argbuf;
-	argdef->next = argdef;
-	argdef->prev = argdef;
-	*argp = args;
-	*eargp = args+ARGSIZ-1;
-	*linep = line;
-	*elinep = line+LINSIZ-1;
-	*error = 0;
-	*gflg = 0;
-	do {
-		cp = *linep;
-		[self word];
-	} while(*cp != '\n');
-	*treec = 0;
-	if(*gflg == 0) {
-		if(*error == 0) {
-			setjmp(*jmp);
-			if (*error)
-				return;
-			t = [self syntax: args end: *argp];
+	ap = ap1;
+	if(ap++ == ap2)
+	{
+		err("invalid assignment", 255);
+		return nil;
+	}
+	if(getClass(*ap1) != Nil)
+	{
+		err("cannot reassign a class", 255);
+		return nil;
+	}
+	if((obj = getObjectRecord(*ap1)) != NULL)
+	{
+		obj->prev->next = obj->next;
+		obj->next->prev = obj->prev;
+		free(obj->name);
+		free(obj);
+	}
+	alloc = malloc(sizeof *alloc);
+	alloc->next = objdef;
+	alloc->prev = objdef->prev;
+	alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
+	objdef->prev->next = alloc;
+	objdef->prev = alloc;
+	if(ap == ap2)
+		return alloc->obj = nil;
+	return alloc->obj = execute(ap, ap2);
+}
+
+static id execute(char **avs, char **ave)
+{
+	register char **cp1;
+	register char **cp2;
+	register id ret;
+
+	cp1 = &avs[0];
+	if(cp1 == ave)
+		return nil;
+	if(equal(cp1[1], "\n"))
+	{
+		err("missing message", 255);
+		return nil;
+	}
+	cp2 = &avs[1];
+	if(equal(*cp1, "="))
+		return assign(cp2, ave);
+	if(scan(*cp1))
+		return string(cp1, ave);
+	syntax(cp1, ave);
+	ret = getClass(*cp1);
+	if(ret == nil)
+		ret = getObject(*cp1);
+	if(ret == nil)
+		return nil;
+	if(argdef->next == argdef)
+		return execute1(ret, *cp2);
+	return execute1(ret, syntax2(ave, cp1, syntax1(cp1, ave)));
+}
+
+static id execute1(id obj, const char *msg)
+{
+	int i;
+	void *arr[10];
+	struct Argument *argnew;
+
+	i = 0;
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
+		i++;
+	if(i > 9)
+	{
+		err("too many arguments", 255);
+		return nil;
+	}
+	i = 0;
+	for(argnew = argdef->next; argnew != argdef; argnew = argnew->next)
+		arr[i++] = getObject(argnew->arg);
+	switch(i)
+	{
+	case 0:
+		return objc_msgSend(obj, sel_registerName(msg));
+	case 1:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0]);
+	case 2:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1]);
+	case 3:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2]);
+	case 4:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3]);
+	case 5:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4]);
+	case 6:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5]);
+	case 7:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6]);
+	case 8:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7]);
+	case 9:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8]);
+	case 10:
+		return objc_msgSend(obj, sel_registerName(msg), arr[0],
+								arr[1],
+								arr[2],
+								arr[3],
+								arr[4],
+								arr[5],
+								arr[6],
+								arr[7],
+								arr[8],
+								arr[9]);
+	}
+	return nil;
+}
+
+static id string(char **avs, char **ave)
+{
+	register char *alloc;
+	register int len;
+	register id obj;
+
+	len = length(avs[0]);
+	alloc = malloc(len + 1);
+	(void) memcpy(alloc, avs[0], len);
+	trim(alloc);
+	obj = [getClass("NSString") stringWithCString: alloc];
+	free(alloc);
+	syntax(avs, ave);
+	if(argdef->next == argdef)
+		return execute1(obj, avs[1]);
+	return execute1(obj, syntax2(ave, avs, syntax1(avs, ave)));
+}
+
+static void syntax(char **avs, char **ave)
+{
+	register struct Argument *argnew;
+	register char **av1;
+	register char **av2;
+
+	av2 = ave;
+	for(av1 = avs; av1 != av2; av1++)
+		if(lastchr(*av1) == ':')
+		{
+			argnew = malloc(sizeof *argnew);
+			argnew->next = argdef;
+			argnew->prev = argdef->prev;
+			argnew->arg = av1[1];
+			argdef->prev->next = argnew;
+			argdef->prev = argnew;
 		}
-		if(*error != 0)
-			[self error: ERR_SYNTAX code: 255]; else
-			[self execute: t input: NULL output: NULL];
+}
+
+static int syntax1(char **avs, char **ave)
+{
+	register char **av1;
+	register char **av2;
+
+	av1 = avs;
+	av2 = ave;
+	if(av1 == av2)
+		return 0;
+	if(lastchr(*av1) == ':')
+		return syntax1(av1 + 1, av2) + strlen(*av1);
+	return syntax1(av1 + 1, av2);
+}
+
+static char *syntax2(char **avs, char **ave, int len)
+{
+	register char **av1;
+	register char **av2;
+	register int l;
+
+	av1 = avs;
+	av2 = ave;
+	l = len;
+	if(av1 == av2)
+	{
+		register char *alloc;
+
+		alloc = malloc(l + 1);
+		alloc[0] = '\0';
+		return alloc;
+	}
+	if(lastchr(*av1) == ':')
+		return strcat(syntax2(av1 - 1, av2, l), *av1);
+	return syntax2(av1 - 1, av2, l);
+}
+
+static void main1(void)
+{
+	register char *cp;
+
+	argp = args;
+	eargp = args+ARGSIZ-1;
+	linep = line;
+	elinep = line+LINSIZ-1;
+	error = 0;
+	gflg = 0;
+	freeArgument(argdef->next);
+	do {
+		cp = linep;
+		word();
+	} while(*cp != '\n');
+	if(gflg == 0) {
+		if(error != 0)
+			err("syntax error", 255);
+		else
+		{
+			register const char *name;
+			register id obj;
+
+			obj = execute(args, argp - 1);
+			name = class_getName([obj class]);
+			(void) printf("%s <%p>\n", name, obj);
+		}
 	}
 }
-@end
+
+static void word(void)
+{
+	register int c, c1;
+
+	*argp++ = linep;
+
+loop:
+	switch(c = getc()) {
+
+	case ' ':
+	case '\t':
+		goto loop;
+
+	case '\'':
+	case '"':
+		c1 = c;
+		while((c=readc()) != c1) {
+			if(c == '\n') {
+				error++;
+				peekc = c;
+				return;
+			}
+			*linep++ = c|QUOTE;
+		}
+		goto pack;
+
+	case ':':
+	case '&':
+	case ';':
+	case '<':
+	case '>':
+	case '(':
+	case ')':
+	case '|':
+	case '^':
+	case '\n':
+		*linep++ = c;
+		*linep++ = '\0';
+		return;
+	}
+
+	peekc = c;
+
+pack:
+	for(;;) {
+		c = getc();
+		if(any(c, " :'\"\t;&<>()|^\n")) {
+			peekc = c;
+			if(any(c, "\"'"))
+				goto loop;
+			if(c == ':')
+				*linep++ = getc();
+			*linep++ = '\0';
+			return;
+		}
+		*linep++ = c;
+	}
+}
