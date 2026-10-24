@@ -1,32 +1,24 @@
 #import "objc_dyn.h"
 
-struct ArgumentList argdef;
-struct ObjectList objdef;
-static struct ClassList clsdef;
-static struct RootList rootdef;
-
-static char *clsroot;
-static struct Symbol *symbols = NULL;
-
 @implementation Shell (Runtime)
 - (void) allocRootClass: (struct RootList *) rootnew
 {
 	struct RootList *roothead;
 
-	roothead = &rootdef;
-	rootdef.next = roothead;
-	rootdef.prev = roothead;
-	while(rootnew != &rootdef)
+	roothead = &self->rootdef;
+	roothead->next = roothead;
+	roothead->prev = roothead;
+	while(rootnew != &self->rootdef)
 	{
 		struct RootList *alloc;
 
 		alloc = malloc(sizeof *alloc);
-		alloc->next = &rootdef;
+		alloc->next = &self->rootdef;
 		alloc->prev = roothead;
 		alloc->cls = rootnew->cls;
 		alloc->meta = rootnew->meta;
 		alloc->name = rootnew->name;
-		rootdef.prev = alloc;
+		self->rootdef.prev = alloc;
 		roothead->next = alloc;
 		roothead = alloc;
 		rootnew = rootnew->next;
@@ -37,7 +29,7 @@ static struct Symbol *symbols = NULL;
 {
 	struct RootList *roothead;
 
-	if(rootnew == &rootdef)
+	if(rootnew == &self->rootdef)
 		return;
 	for(roothead = rootnew->next;
 	    roothead != rootnew;
@@ -56,18 +48,18 @@ static struct Symbol *symbols = NULL;
 {
 	struct RootList roothead;
 
-	if(clsnew == &clsdef)
+	if(clsnew == &self->clsdef)
 	{
-		[self forEachRootClass: rootdef.next];
-		[self allocRootClass: rootdef.next];
+		[self forEachRootClass: self->rootdef.next];
+		[self allocRootClass: self->rootdef.next];
 		return;
 	}
-	roothead.next = &rootdef;
+	roothead.next = &self->rootdef;
 	roothead.prev = rootnew;
 	roothead.cls = clsnew->root;
 	roothead.meta = class_get_meta_class(clsnew->root);
 	roothead.name = class_get_class_name(clsnew->root);
-	rootdef.prev = &roothead;
+	self->rootdef.prev = &roothead;
 	rootnew->next = &roothead;
 	[self loadRootClass: &roothead class: clsnew->next];
 }
@@ -82,7 +74,7 @@ static struct Symbol *symbols = NULL;
 
 	if(loaded)
 		return;
-	clsnew = &clsdef;
+	clsnew = &self->clsdef;
 	clsnew->next = clsnew;
 	clsnew->prev = clsnew;
 	clshead = clsnew;
@@ -96,19 +88,19 @@ static struct Symbol *symbols = NULL;
 		clsnew->super = class_get_super_class(clsnew->cls);
 		clsnew->meta = class_get_meta_class(clsnew->cls);
 		clsnew->root = [self getRootClass: clsnew->cls];
-		clsnew->next = &clsdef;
+		clsnew->next = &self->clsdef;
 		clsnew->prev = clshead;
-		clsdef.prev = clsnew;
+		self->clsdef.prev = clsnew;
 		clshead->next = clsnew;
 		clshead = clsnew;
 	}
-	argdef.next = &argdef;
-	argdef.prev = &argdef;
-	objdef.next = &objdef;
-	objdef.prev = &objdef;
-	rootdef.next = &rootdef;
-	rootdef.prev = &rootdef;
-	[self loadRootClass: &rootdef class: clsdef.next];
+	self->argdef.next = &self->argdef;
+	self->argdef.prev = &self->argdef;
+	self->objdef.next = &self->objdef;
+	self->objdef.prev = &self->objdef;
+	self->rootdef.next = &self->rootdef;
+	self->rootdef.prev = &self->rootdef;
+	[self loadRootClass: &self->rootdef class: self->clsdef.next];
 	[self setRootClass: rootname];
 	loaded = 1;
 }
@@ -130,9 +122,9 @@ static struct Symbol *symbols = NULL;
 {
 	struct ClassList *clsnew;
 
-	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
+	for(clsnew = self->clsdef.next; clsnew != &self->clsdef; clsnew = clsnew->next)
 		if([self equalString: clsname to: clsnew->name] &&
-		   [self equalString: clsroot to: class_get_class_name(clsnew->root)])
+		   [self equalString: self->clsroot to: class_get_class_name(clsnew->root)])
 			return clsnew->cls;
 	return Nil;
 }
@@ -141,7 +133,7 @@ static struct Symbol *symbols = NULL;
 {
 	struct ObjectList *objnew;
 
-	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
 		if([self equalString: objname to: objnew->name])
 			return objnew->obj;
 	return nil;
@@ -151,7 +143,7 @@ static struct Symbol *symbols = NULL;
 {
 	struct ObjectList *objnew;
 
-	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
 		if([self equalString: objname to: objnew->name])
 			return objnew;
 	return NULL;
@@ -161,7 +153,7 @@ static struct Symbol *symbols = NULL;
 {
 	struct ClassList *clsnew;
 
-	for(clsnew = clsdef.next; clsnew != &clsdef; clsnew = clsnew->next)
+	for(clsnew = self->clsdef.next; clsnew != &self->clsdef; clsnew = clsnew->next)
 		if([self equalString: clsname to: clsnew->name])
 			return clsnew;
 	return NULL;
@@ -169,23 +161,23 @@ static struct Symbol *symbols = NULL;
 
 - (void) setRootClass: (const char *) new
 {
-	free(clsroot);
-	clsroot = strcpy(malloc(strlen(new) + 1), new);
+	free(self->clsroot);
+	self->clsroot = strcpy(malloc(strlen(new) + 1), new);
 }
 
 - (struct ObjectList *) getObjectList
 {
-	return &objdef;
+	return &self->objdef;
 }
 
 - (struct ArgumentList *) getArgumentList
 {
-	return &argdef;
+	return &self->argdef;
 }
 
 - (void) freeArgument: (struct ArgumentList *) argnew
 {
-	if(argnew == &argdef)
+	if(argnew == &self->argdef)
 	{
 		argnew->next = argnew;
 		argnew->prev = argnew;
@@ -213,12 +205,12 @@ static struct Symbol *symbols = NULL;
 		return val;
 	}
 	obj = malloc(sizeof *obj);
-	obj->next = &objdef;
-	obj->prev = objdef.prev;
+	obj->next = &self->objdef;
+	obj->prev = self->objdef.prev;
 	obj->name = strcpy(malloc(strlen(name) + 1), name);
 	obj->obj = val;
-	objdef.prev->next = obj;
-	objdef.prev = obj;
+	self->objdef.prev->next = obj;
+	self->objdef.prev = obj;
 	return val;
 }
 
@@ -226,7 +218,7 @@ static struct Symbol *symbols = NULL;
 {
 	struct ObjectList *objnew;
 
-	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
 		if([self equalString: name to: objnew->name])
 			return objnew->obj;
 	return nil;
@@ -235,6 +227,7 @@ static struct Symbol *symbols = NULL;
 /* Symbol support */
 - (id) internSymbol: (const char *) name
 {
+	static struct Symbol *symbols = NULL;
 	struct Symbol *sym;
 
 	for(sym = symbols; sym != NULL; sym = sym->next)
