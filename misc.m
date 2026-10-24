@@ -34,6 +34,7 @@
 #import "objc_dyn.h"
 
 static char subchar = '$';
+static char ungetc_buf = 0;
 
 @implementation Shell (Miscellaneous)
 - (int) readCharacter
@@ -130,6 +131,13 @@ static char subchar = '$';
 		peekc = 0;
 		return(c);
 	}
+
+	/* Support ungetCharacter via peekc */
+	if(ungetc_buf) {
+		c = ungetc_buf;
+		ungetc_buf = 0;
+		return(c);
+	}
 	if(argp > eargp) {
 		argp -= 10;
 		while((c=[self getCharacter: !DOLREPL]) != '\n');
@@ -189,6 +197,11 @@ getd:
 	return(c&0177);
 }
 
+- (void) ungetCharacter: (int) c
+{
+	ungetc_buf = c;
+}
+
 - (void) scan: (struct Tree *) at selector: (SEL) sel
 {
 	register char *p, **t, c;
@@ -209,6 +222,21 @@ getd:
 - (int) trim: (int) c
 {
 	return(c&0177);
+}
+
+- (id) describeObject: (id) obj
+{
+	if(obj == nil)
+		[self printString: "nil"];
+	else if(obj == Nil)
+		[self printString: "Nil"];
+	else
+	{
+		[self printString: class_get_class_name(object_get_class(obj))];
+		(void) printf(" <%p>", obj);
+	}
+	[self putCharacter: '\n'];
+	return obj;
 }
 
 - (char *) integerToASCII: (int) n
