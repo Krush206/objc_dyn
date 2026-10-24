@@ -8,7 +8,7 @@ LIBOBJC = -lobjc
 OBJS = sh.o exec.o func.o lex.o misc.o parse.o proc.o sem.o objc_dyn.o gnustep.o
 
 sh: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) -L$(LDIR) -lgnustep-base $(LIBOBJC) -lm -Wl,-rpath,$(LDIR)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) -L$(LDIR) $(LIBOBJC) -lm -Wl,-rpath,$(LDIR)
 
 %.o: %.m sh.h
 	$(CC) $(CFLAGS) -c $< -o $@
