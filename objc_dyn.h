@@ -6,14 +6,10 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
-#import <sys/wait.h>
-#import <fcntl.h>
-
 #import "/usr/local/include/objc/Object.h"
 #import "/usr/local/include/objc/objc-api.h"
 
 #define QUOTE 0200
-
 #define FAND 1
 #define FCAT 2
 #define FPIN 4
@@ -42,7 +38,6 @@
 #define TRESIZ 100
 #define NUMSIZ 12
 #define CMDSIZ 100
-#define MSGSIZ 100
 
 #define ERR_SYNTAX "syntax error"
 #define ERR_EQUALS "'=' error"
@@ -112,12 +107,6 @@ struct Tree {
 	} t_dcom;
 };
 
-extern int treec;
-extern int errval;
-extern int idolp;
-extern char *dolp;
-extern char **dolv;
-extern int dolc;
 extern char *promp;
 extern char *linep;
 extern char *elinep;
@@ -126,60 +115,37 @@ extern char **eargp;
 extern int peekc;
 extern int gflg;
 extern int error;
-extern int uid;
-extern int setintr;
-extern char *arginp;
-extern int onelflg;
-extern int stoperr;
-extern int execflg;
+extern int dolc;
+extern int idolp;
+extern char pidp[NUMSIZ];
+extern char *dolp;
+extern char **dolv;
+extern char seta[][EXPSIZ];
+extern int treec;
+extern char line[LINSIZ];
+extern char *args[ARGSIZ];
+extern struct Tree trebuf[TRESIZ];
 extern jmp_buf jmp;
-extern struct ObjectList *objdef;
-extern struct ArgumentList *argdef;
 
 @interface Shell: Object
-{
-@private
-	char msg[MSGSIZ];
-	char seta[26][EXPSIZ];
-	char line[LINSIZ];
-	char *args[ARGSIZ];
-	char pidp[NUMSIZ];
-	struct Tree trebuf[TRESIZ];
-}
 + (int) argc: (int) c argv: (char *[]) av;
-- (void) main;
-@end
-
-@interface Shell (Semantic)
-- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
-@end
-
-@interface Shell (Process)
-- (void) wait: (int) i;
-@end
-
-@interface Shell (Execute)
 - (id) execute: (id) obj message: (const char *) msg;
 - (char *) buildArguments: (char **) line;
 - (void) execute: (char *) f tree: (struct Tree *) at;
-@end
-
-@interface Shell (Lexer)
 - (void) word;
-- (void) setVariable: (int) i value: (char *) na;
-- (int) readCharacter;
-- (int) getCharacter: (int) flag;
-@end
-
-@interface Shell (Parser)
+- (void) expand: (int) i value: (char *) na;
+- (void) main;
+- (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2;
 - (struct Tree *) syntax: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn1: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn2: (char **) p1 end: (char **) p2;
 - (struct Tree *) syn3: (char **) p1 end: (char **) p2;
 - (struct Tree *) tree;
+- (void) wait: (int) i;
 @end
 
 @interface Shell (Miscellaneous)
+- (int) readCharacter;
 - (void) printString: (const char *) as;
 - (void) putCharacter: (int) c;
 - (void) printNumber: (int) n;
@@ -187,22 +153,11 @@ extern struct ArgumentList *argdef;
 - (int) equalString: (const char *) as1 to: (const char *) as2;
 - (void) error: (const char *) s code: (int) exitno;
 - (int) lastCharacter: (char *) cp;
+- (int) getCharacter: (int) flag;
 - (void) scan: (struct Tree *) at selector: (SEL) sel;
 - (int) glob: (int) c;
 - (int) trim: (int) c;
 - (char *) integerToASCII: (int) n;
-- (char *) getPIDPointer;
-- (void) setPIDPointer: (char *) ptr;
-- (char *) getLine;
-- (void) setLine: (char *) ptr;
-- (char **) getArguments;
-- (void) setArguments: (char **) ptr;
-- (struct Tree *) getTreeBuffer;
-- (void) setTreeBuffer: (struct Tree *) ptr;
-- (char *) getMessage;
-- (void) setMessage: (char *) ptr;
-- (char (*)[]) getSetA;
-- (void) setSetA: (char (*)[]) ptr;
 @end
 
 @interface Shell (Runtime)
