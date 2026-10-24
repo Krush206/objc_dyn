@@ -31,9 +31,23 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "sh.h"
+#import "objc_dyn.h"
+
+static char subchar = '$';
 
 @implementation Shell (Miscellaneous)
+- (int) readCharacter
+{
+	int rdstat, c;
+	char cc;
+
+	if((rdstat = read(0, &cc, (size_t) 1)) != 1) {
+		if(rdstat==0) exit(0); /* end of file*/
+		else exit(255); /* error */
+	}
+	return(c = cc);
+}
+
 - (void) printString: (const char *) as
 {
 	register const char *s;
@@ -87,7 +101,7 @@
 {
 	[self printString: s];
 	[self printString: "\n"];
-	if(*promp == NULL) {
+	if(promp == NULL) {
 		lseek(0, (off_t) 0, SEEK_END);
 		exit(exitno);
 	}
@@ -105,23 +119,90 @@
 	return c = cp[0];
 }
 
+/*	flag: !DOLREPL ==> no substitution, DOLREPL ==> substitute,
+	DOLREPQ ==> quoted substitution: "$1" = value of $1 for sure */
+- (int) getCharacter: (int) flag
+{
+	register char c;
+
+	if(peekc) {
+		c = peekc;
+		peekc = 0;
+		return(c);
+	}
+	if(argp > eargp) {
+		argp -= 10;
+		while((c=[self getCharacter: !DOLREPL]) != '\n');
+		argp += 10;
+		[self error: ERR_ARGS code: 255];
+		gflg++;
+		return(c);
+	}
+	if(linep > elinep) {
+		linep -= 10;
+		while((c=[self getCharacter: !DOLREPL]) != '\n');
+		linep += 10;
+		[self error: ERR_CHAR code: 255];
+		gflg++;
+		return(c);
+	}
+getd:
+	if(dolp) {
+		if (c = *dolp++) {
+			if (flag == DOLREPQ)
+				c |= QUOTE;
+			return c;
+		}
+		if (idolp && ++idolp < dolc) {
+			dolp = dolv[idolp];
+			return(' ');
+		}
+		dolp = 0;
+	}
+	c = [self readCharacter];
+	if(c == subchar && flag) {
+		c = [self readCharacter];
+		if(c>='0' && c<='9') {
+			if(c-'0' < dolc)
+				dolp = dolv[c-'0'];
+			goto getd;
+		}
+		else if(c>='a' && c<='z') {
+			dolp = seta[c-'a'];
+			goto getd;
+		}
+		else if(c == '$') {
+			dolp = pidp;
+			goto getd;
+		}
+		/* $* = $1 $2 .... */
+		else if (c == '*') {
+			if (dolc > 1) {
+				idolp = 1;
+				dolp = dolv[1];
+			}
+			goto getd;
+		}
+		else
+			if(c != '\n')  c = [self readCharacter];
+	}
+	return(c&0177);
+}
+
 - (void) scan: (struct Tree *) at selector: (SEL) sel
 {
-	typedef int (*method_t)(id, SEL, int);
 	register char *p, **t, c;
-	void *imp;
 
 	t = at->DARR;
-	imp = objc_msg_lookup(self, sel);
 	while((p = *t++))
 		while((c = *p))
-			*p++ = (*(method_t) imp)(self, sel, c);
+			;
 }
 
 - (int) glob: (int) c
 {
 	if([self anyCharacter: c in: "[?*"])
-		*gflg = 1;
+		gflg = 1;
 	return(c);
 }
 
@@ -132,253 +213,19 @@
 
 - (char *) integerToASCII: (int) n
 {
-	register int i;
+	register int i, j;
 	register char *cp;
 	static char str[NUMSIZ];
 
-	i = n;
+	j = n;
 	cp = &str[sizeof str - 1];
 	for (;;) {
-		*cp = i % 10 + '0';
-		i /= 10;
-		if(i == 0)
+		*cp = j % 10 + '0';
+		j /= 10;
+		if(j == 0)
 			return cp;
 		cp--;
 	}
 	return NULL;
-}
-
-- (char *) getPIDPointer
-{
-	return pidp;
-}
-
-- (void) setPIDPointer: (char *) ptr
-{
-	(void) memcpy(pidp, ptr, sizeof pidp);
-}
-
-- (struct Tree *) getTreeBuffer
-{
-	return trebuf;
-}
-
-- (void) setTreeBuffer: (struct Tree *) ptr
-{
-	(void) memcpy(trebuf, ptr, sizeof trebuf);
-}
-
-- (char **) getArguments
-{
-	return args;
-}
-
-- (void) setArguments: (char **) ptr
-{
-	(void) memcpy(args, ptr, sizeof args);
-}
-
-- (char (*)[]) getSetASCII
-{
-	return seta;
-}
-
-- (void) setSetASCII: (char (*)[]) ptr
-{
-	(void) memcpy(seta, ptr, sizeof seta);
-}
-
-- (char *) getMessage
-{
-	return msg;
-}
-
-- (void) setMessage: (char *) ptr
-{
-	(void) memcpy(msg, ptr, sizeof msg);
-}
-
-- (char *) getLine
-{
-	return line;
-}
-
-- (void) setLine: (char *) ptr
-{
-	(void) memcpy(line, ptr, sizeof line);
-}
-
-- (struct Argument *) getArgumentBuffer
-{
-	return argbuf;
-}
-
-- (void) setArgumentBuffer: (struct Argument *) ptr
-{
-	(void) memcpy(argbuf, ptr, sizeof argbuf);
-}
-
-- (id) getFunction
-{
-	return func;
-}
-
-- (void) setFunction: (id) ptr
-{
-	func = ptr;
-}
-
-- (int *) getTreeCount
-{
-	static int ret;
-
-	return treec = &ret;
-}
-
-- (int *) getErrorValue
-{
-	static int ret;
-
-	return errval = &ret;
-}
-
-- (int *) getCurrentDollarPointer
-{
-	static int ret;
-
-	return idolp = &ret;
-}
-
-- (char **) getDollarPointer
-{
-	static char *ret;
-
-	return dolp = &ret;
-}
-
-- (char ***) getDollarVector
-{
-	static char **ret;
-
-	return dolv = &ret;
-}
-
-- (int *) getDollarCount
-{
-	static int ret;
-
-	return dolc = &ret;
-}
-
-- (char **) getPrompt
-{
-	static char *ret;
-
-	return promp = &ret;
-}
-
-- (char **) getLinePointer
-{
-	static char *ret;
-
-	return linep = &ret;
-}
-
-- (char **) getEndLinePointer
-{
-	static char *ret;
-
-	return elinep = &ret;
-}
-
-- (char ***) getArgumentPointer
-{
-	static char **ret;
-
-	return argp = &ret;
-}
-
-- (char ***) getEndArgumentPointer
-{
-	static char **ret;
-
-	return eargp = &ret;
-}
-
-- (int *) getPeekCharacter
-{
-	static int ret;
-
-	return peekc = &ret;
-}
-
-- (int *) getGlobFlag
-{
-	static int ret;
-
-	return gflg = &ret;
-}
-
-- (int *) getError
-{
-	static int ret;
-
-	return error = &ret;
-}
-
-- (int *) getUserID
-{
-	static int ret;
-
-	return uid = &ret;
-}
-
-- (int *) getSetInterrupt
-{
-	static int ret;
-
-	return setintr = &ret;
-}
-
-- (char **) getArgumentInput
-{
-	static char *ret;
-
-	return arginp = &ret;
-}
-
-- (int *) getOneLineFlag
-{
-	static int ret;
-
-	return onelflg = &ret;
-}
-
-- (int *) getStopError
-{
-	static int ret;
-
-	return stoperr = &ret;
-}
-
-- (int *) getExecuteFlag
-{
-	static int ret;
-
-	return execflg = &ret;
-}
-
-- (jmp_buf *) getJumpBuffer
-{
-	static jmp_buf ret;
-
-	return jmp = &ret;
-}
-
-- (struct Argument *) getArgumentDefinition
-{
-	static struct Argument ret;
-
-	return argdef = &ret;
 }
 @end
