@@ -38,7 +38,7 @@
 
 @interface Shell (Private)
 - (void) main;
-- (id) assignAp1: (char **) ap1 ap2: (char **) ap2;
+- (id) assignVar: (const char *) name value: (id) val;
 - (id) executeAvs: (char **) avs ave: (char **) ave;
 - (id) execute1: (id) obj msg: (const char *) msg;
 - (id) stringAvs: (char **) avs ave: (char **) ave;
@@ -48,6 +48,7 @@
 - (void) main1;
 - (void) word;
 - (int) scan: (const char *) name;
+- (id) resolveName: (const char *) name;
 @end
 
 char *promp;
@@ -99,7 +100,7 @@ main(void)
 
 - (void) main
 {
-	[self loadClass: "NSObject"];
+	[self loadClass: "Object"];
 	promp = "% ";
 	if(getuid() == 0)
 		promp = "# ";
@@ -108,44 +109,50 @@ main(void)
 loop:
 	if(promp != NULL)
 		[self printString: promp];
-	peekc = [self getCharacter: DOLREPL];
+	if(!peekc)
+		peekc = [self getCharacter: DOLREPL];
+	if(peekc == '\n' || peekc == 0) {
+		/* End of input or empty line - reset and continue */
+		if(peekc == 0) exit(0);
+		peekc = 0;
+		goto loop;
+	}
 	[self main1];
 	goto loop;
 }
 
-- (id) assignAp1: (char **) ap1 ap2: (char **) ap2
+/* Resolve a name: variable > class > object */
+- (id) resolveName: (const char *) name
 {
-	register struct ObjectList *obj;
-	register struct ObjectList *alloc;
-	register char **ap;
+	id val;
 
-	ap = ap1;
-	if(ap++ == ap2)
-	{
-		[self error: "invalid assignment" code: 255];
-		return nil;
-	}
-	if([self getClass: *ap1] != Nil)
+	/* Check variable first */
+	val = [self getVariable: name];
+	if(val != nil)
+		return val;
+
+	/* Check class */
+	Class cls = [self getClass: name];
+	if(cls != Nil)
+		return (id) cls;
+
+	/* Check object */
+	id obj = [self getObject: name];
+	if(obj != nil)
+		return obj;
+
+	return nil;
+}
+
+/* Smalltalk assignment: var := value */
+- (id) assignVar: (const char *) name value: (id) val
+{
+	if([self getClass: name] != Nil)
 	{
 		[self error: "cannot reassign a class" code: 255];
 		return nil;
 	}
-	if((obj = [self getObjectRecord: *ap1]) != NULL)
-	{
-		obj->prev->next = obj->next;
-		obj->next->prev = obj->prev;
-		free(obj->name);
-		free(obj);
-	}
-	alloc = malloc(sizeof *alloc);
-	alloc->next = &objdef;
-	alloc->prev = objdef.prev;
-	alloc->name = strcpy(malloc(strlen(*ap1) + 1), *ap1);
-	objdef.prev->next = alloc;
-	objdef.prev = alloc;
-	if(ap == ap2)
-		return alloc->obj = nil;
-	return alloc->obj = [self executeAvs: ap ave: ap2];
+	return [self setVariable: name value: val];
 }
 
 - (id) executeAvs: (char **) avs ave: (char **) ave
@@ -153,28 +160,51 @@ loop:
 	register char **cp1;
 	register char **cp2;
 	register id ret;
+	register int i;
 
 	cp1 = &avs[0];
 	if(cp1 == ave)
 		return nil;
+
+	/* Scan for Smalltalk assignment: var := expr */
+	for(i = 0; cp1 + i < ave; i++)
+	{
+		if([self equalString: cp1[i] to: ":="])
+		{
+			if(cp1 + i + 1 == ave || cp1 + i + 2 > ave)
+			{
+				[self error: "invalid assignment" code: 255];
+				return nil;
+			}
+			return [self assignVar: cp1[i-1] value: [self executeAvs: cp1 + i + 1 ave: ave]];
+		}
+	}
+
+	/* Check for missing message */
 	if([self equalString: cp1[1] to: "\n"])
 	{
+		/* Bare name: resolve and print */
+		ret = [self resolveName: *cp1];
+		if(ret != nil)
+		{
+			[self describeObject: ret];
+			return ret;
+		}
 		[self error: "missing message" code: 255];
 		return nil;
 	}
-	cp2 = &avs[1];
-	if([self equalString: *cp1 to: "="])
-		return [self assignAp1: cp2 ap2: ave];
+
+	/* String literal */
 	if([self scan: *cp1])
 		return [self stringAvs: cp1 ave: ave];
+
+	/* Resolve receiver name */
 	[self syntaxAvs: cp1 ave: ave];
-	ret = [self getClass: *cp1];
-	if(ret == nil)
-		ret = [self getObject: *cp1];
+	ret = [self resolveName: *cp1];
 	if(ret == nil)
 		return nil;
-	if(argdef.next == &argdef)
-		return [self execute1: ret msg: *cp2];
+
+	/* Build keyword selector from arguments with : */
 	return [self execute1: ret msg: [self syntax2: ave cp1: cp1 len1: [self syntax1: cp1 ave: ave]]];
 }
 
@@ -330,19 +360,22 @@ loop:
 			[self error: "syntax error" code: 255];
 		else
 		{
-			register const char *name;
 			register id obj;
 
-			obj = [self executeAvs: args ave: argp - 1];
-			name = class_get_class_name(object_get_class(obj));
-			(void) printf("%s <%p>\n", name, obj);
+			/* Only execute if we read at least one word */
+			if(argp > args)
+			{
+				obj = [self executeAvs: args ave: argp - 1];
+				[self describeObject: obj];
+			}
 		}
 	}
 }
 
+/* Smalltalk symbol literal #symbol */
 - (int) scan: (const char *) name
 {
-	return(*name == '\'' || *name == '"');
+	return(*name == '\'' || *name == '"' || *name == '#');
 }
 
 - (void) word
@@ -371,7 +404,34 @@ loop:
 		}
 		goto pack;
 
+	case '#':
+		/* Symbol literal */
+		*linep++ = c;
+		c = [self getCharacter: DOLREPL];
+		while(c != ' ' && c != '\t' && c != '\n' && c != ':' &&
+		      c != ';' && c != '&' && c != '|' && c != '<' &&
+		      c != '>' && c != '(' && c != ')' && c != '^') {
+			*linep++ = c;
+			c = [self getCharacter: DOLREPL];
+		}
+		[self ungetCharacter: c];
+		*linep++ = '\0';
+		return;
+
 	case ':':
+		/* Could be := or selector : */
+		c1 = [self getCharacter: DOLREPL];
+		if(c1 == '=') {
+			*linep++ = ':';
+			*linep++ = '=';
+			*linep++ = '\0';
+			return;
+		}
+		[self ungetCharacter: c1];
+		*linep++ = c;
+		*linep++ = '\0';
+		return;
+
 	case '&':
 	case ';':
 	case '<':
@@ -391,7 +451,7 @@ loop:
 pack:
 	for(;;) {
 		c = [self getCharacter: DOLREPL];
-		if([self anyCharacter: c in: " '\"\t;&<>()|^\n"]) {
+		if([self anyCharacter: c in: " '\"\t;&<>()|^\n:"]) {
 			peekc = c;
 			if([self anyCharacter: c in: "\"'"])
 				goto loop;
