@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -O2 -I/usr/local/include/objc -I/usr/local/GNUstep/Local/Library/Headers
+CFLAGS = -Wall -O2 -I/usr/local/GNUstep/Local/Library/Headers
 LDIR = /usr/local/GNUstep/Local/Library/Libraries
 LIBOBJC = -lobjc
 
