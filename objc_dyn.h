@@ -2,6 +2,7 @@
 #define OBJC_DYN 1
 #import <stdlib.h>
 #import <string.h>
+#import <stdio.h>
 #import <unistd.h>
 #import <signal.h>
 #import <setjmp.h>
@@ -55,6 +56,11 @@
 #define DOLREPL 1
 #define DOLREPQ 2
 
+/* Smalltalk syntax tokens */
+#define TOK_ASSIGN  0x8000  /* := */
+#define TOK_SYMBOL  0x8001  /* #symbol */
+#define TOK_CASCADE 0x8002  /* ; */
+
 struct ClassList {
 	Class cls;
 	Class super;
@@ -78,6 +84,11 @@ struct ObjectList {
 	char *name;
 	struct ObjectList *next;
 	struct ObjectList *prev;
+};
+
+struct Symbol {
+	char *name;
+	struct Symbol *next;
 };
 
 struct ArgumentList {
@@ -156,10 +167,12 @@ extern struct ArgumentList argdef;
 - (void) error: (const char *) s code: (int) exitno;
 - (int) lastCharacter: (char *) cp;
 - (int) getCharacter: (int) flag;
+- (void) ungetCharacter: (int) c;
 - (void) scan: (struct Tree *) at selector: (SEL) sel;
 - (int) glob: (int) c;
 - (int) trim: (int) c;
 - (char *) integerToASCII: (int) n;
+- (id) describeObject: (id) obj;
 @end
 
 @interface Shell (Runtime)
@@ -178,5 +191,26 @@ extern struct ArgumentList argdef;
 - (struct ArgumentList *) getArgumentList;
 - (void) freeArgument: (struct ArgumentList *) argnew;
 - (void) resolveLinks;
+/* Variable assignment and lookup */
+- (id) setVariable: (const char *) name value: (id) val;
+- (id) getVariable: (const char *) name;
+/* Symbol support */
+- (id) internSymbol: (const char *) name;
+@end
+
+@interface Shell (Lexer)
+- (void) word;
+- (int) getToken;
+- (int) peekToken;
+- (void) ungetToken: (int) tok;
+@end
+
+@interface Shell (Parser)
+- (struct Tree *) syntax: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn1: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn2: (char **) p1 end: (char **) p2;
+- (struct Tree *) syn3: (char **) p1 end: (char **) p2;
+- (struct Tree *) tree;
+- (id) parseMessage: (char **) p1 end: (char **) p2;
 @end
 #endif /* !OBJC_DYN */
