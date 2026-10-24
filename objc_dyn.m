@@ -6,6 +6,7 @@ static struct ClassList clsdef;
 static struct RootList rootdef;
 
 static char *clsroot;
+static struct Symbol *symbols = NULL;
 
 @implementation Shell (Runtime)
 - (void) allocRootClass: (struct RootList *) rootnew
@@ -199,5 +200,50 @@ static char *clsroot;
 	extern void __objc_resolve_class_links(void);
 
 	__objc_resolve_class_links();
+}
+
+/* Variable assignment and lookup */
+- (id) setVariable: (const char *) name value: (id) val
+{
+	struct ObjectList *obj;
+
+	if((obj = [self getObjectRecord: name]) != NULL)
+	{
+		obj->obj = val;
+		return val;
+	}
+	obj = malloc(sizeof *obj);
+	obj->next = &objdef;
+	obj->prev = objdef.prev;
+	obj->name = strcpy(malloc(strlen(name) + 1), name);
+	obj->obj = val;
+	objdef.prev->next = obj;
+	objdef.prev = obj;
+	return val;
+}
+
+- (id) getVariable: (const char *) name
+{
+	struct ObjectList *objnew;
+
+	for(objnew = objdef.next; objnew != &objdef; objnew = objnew->next)
+		if([self equalString: name to: objnew->name])
+			return objnew->obj;
+	return nil;
+}
+
+/* Symbol support */
+- (id) internSymbol: (const char *) name
+{
+	struct Symbol *sym;
+
+	for(sym = symbols; sym != NULL; sym = sym->next)
+		if([self equalString: name to: sym->name])
+			return (id) sym;
+	sym = malloc(sizeof *sym);
+	sym->name = strcpy(malloc(strlen(name) + 1), name);
+	sym->next = symbols;
+	symbols = sym;
+	return (id) sym;
 }
 @end
