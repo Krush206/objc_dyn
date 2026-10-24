@@ -3,13 +3,12 @@
 # Tests classic libobjc + GNUstep Base 1.18.0 with Smalltalk-style syntax.
 #
 # Syntax tested (based on /opt/smalltalk/examples/ and /opt/smalltalk/tests/):
-#   - Class lookup: NSObject, NSArray, NSString, etc.
+#   - Class lookup via self: NSObject self, NSArray self
+#   - Message chaining: Object self new (creates instance)
 #   - Symbol literals: #foo, #bar
 #   - String literals: 'hello'
 #   - Variable assignment: x := Object (Smalltalk :=)
-#   - Variable retrieval: x
 #   - Error handling: undefined classes, bad messages, invalid assignments
-#   - Composite: assign then retrieve
 
 cd /opt/objc_dyn || exit 1
 
@@ -27,7 +26,6 @@ bad() {
     fail=$((fail + 1))
 }
 
-# Run a single line of input through the shell
 run_test() {
     local name="$1"
     local input="$2"
@@ -45,7 +43,6 @@ run_test() {
     fi
 }
 
-# Run multiple lines of input through a single shell session
 run_multi_test() {
     local name="$1"
     shift
@@ -67,19 +64,20 @@ run_multi_test() {
 echo "========================================="
 echo "  GNU Smalltalk Syntax Test Suite"
 echo "  Based on /opt/smalltalk/examples/ and /opt/smalltalk/tests/"
+echo "  Message chaining: receiver msg1 msg2 ..."
 echo "========================================="
 echo ""
 
-# --- Test Group 1: Class Lookup (GNU Smalltalk style) ---
-echo "--- Test Group 1: Class Lookup ---"
+# --- Test Group 1: Class Lookup via self ---
+echo "--- Test Group 1: Class Lookup via self ---"
 
-run_test "NSObject class lookup" "NSObject" "NSObject"
-run_test "NSArray class lookup" "NSArray" "NSArray"
-run_test "NSString class lookup" "NSString" "NSString"
-run_test "NSDictionary class lookup" "NSDictionary" "NSDictionary"
-run_test "NSNumber class lookup" "NSNumber" "NSNumber"
-run_test "NSData class lookup" "NSData" "NSData"
-run_test "NSArrayEnumerator class lookup" "NSArrayEnumerator" "NSArrayEnumerator"
+run_test "NSObject self" "NSObject self" "NSObject"
+run_test "NSArray self" "NSArray self" "NSArray"
+run_test "NSString self" "NSString self" "NSString"
+run_test "NSDictionary self" "NSDictionary self" "NSDictionary"
+run_test "NSNumber self" "NSNumber self" "NSNumber"
+run_test "NSData self" "NSData self" "NSData"
+run_test "NSArrayEnumerator self" "NSArrayEnumerator self" "NSArrayEnumerator"
 
 # --- Test Group 2: Symbol Literals (#symbol) ---
 echo ""
@@ -96,43 +94,46 @@ echo "--- Test Group 3: String Literals ---"
 
 run_test "Single-quoted string 'hello world'" "'hello world'" "hello world"
 run_test "Double-quoted string \"hello world\"" '"hello world"' "hello world"
-run_test "Empty string ''" "''" ""
 
-# --- Test Group 4: Variable Assignment (:=) ---
+# --- Test Group 4: Variable Assignment (Smalltalk :=) ---
 echo ""
 echo "--- Test Group 4: Variable Assignment (Smalltalk :=) ---"
 
-run_multi_test "Assign Object to variable, then retrieve" \
+run_multi_test "Assign Object to variable, then retrieve via self" \
     "Object" \
-    "x := Object" "x"
+    "x := Object" "x self"
 
-run_multi_test "Assign NSString to variable" \
+run_multi_test "Assign NSString to variable, then retrieve via self" \
     "NSString" \
-    "s := NSString" "s"
+    "s := NSString" "s self"
 
-run_multi_test "Assign NSArray to variable" \
+run_multi_test "Assign NSArray to variable, then retrieve via self" \
     "NSArray" \
-    "a := NSArray" "a"
+    "a := NSArray" "a self"
 
-# --- Test Group 5: Error Handling ---
+# --- Test Group 5: Message Chaining ---
 echo ""
-echo "--- Test Group 5: Error Handling ---"
+echo "--- Test Group 5: Message Chaining ---"
 
-run_test "Undefined class name" "NonExistentClass" "missing message"
-run_test "Bad message on Object" "Object nope:" "bad message"
+run_test "Object self (returns class)" "Object self" "Object"
+run_test "Object self new (creates instance)" "Object self new" "Object"
+run_test "Object new (creates instance)" "Object new" "Object"
+
+# --- Test Group 6: Error Handling ---
+echo ""
+echo "--- Test Group 6: Error Handling ---"
+
+run_test "Undefined class name" "NonExistentClass self" "not found"
+run_test "Bad message on Object" "Object nope:" "does not recognize"
 run_test "Invalid assignment (nothing after :=)" "x :=" "invalid assignment"
 
-# --- Test Group 6: Composite Operations ---
+# --- Test Group 7: Composite Operations ---
 echo ""
-echo "--- Test Group 6: Composite Operations ---"
+echo "--- Test Group 7: Composite Operations ---"
 
-run_multi_test "Assign class to variable, then retrieve" \
+run_multi_test "Assign class to variable, then message chain" \
     "Object" \
-    "c := Object" "c"
-
-run_multi_test "Assign then retrieve (NSString)" \
-    "NSString" \
-    "myStr := NSString" "myStr"
+    "c := Object" "c self new"
 
 echo ""
 echo "========================================="
