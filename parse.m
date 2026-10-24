@@ -32,6 +32,7 @@
  */
 
 #import "objc_dyn.h"
+#import <setjmp.h>
 
 @implementation Shell (Parser)
 
@@ -111,12 +112,9 @@
 	if([self scan: *cp1])
 		return [self string: cp1 count: end];
 
-	/* Check for missing message (bare name) */
-	if(cp1 + 1 >= end || [self equalString: cp1[1] to: "\n"])
+	/* Every entry requires a message */
+	if(cp1 + 1 >= end)
 	{
-		ret = [self resolve: *cp1];
-		if(ret != nil)
-			return ret;
 		[self error: "missing message" code: 255];
 		return nil;
 	}
@@ -125,9 +123,25 @@
 	[self collectArguments: cp1 count: end];
 	ret = [self resolve: *cp1];
 	if(ret == nil)
+	{
+		[self error: "not found" code: 255];
 		return nil;
+	}
 
-	return [self perform: ret message: [self buildSelector: end - 1 count: cp1 length: [self selectorLength: cp1 count: end]]];
+	/* If colon-terminated arguments exist, build keyword selector */
+	if(self->argdef.next != &self->argdef)
+		return [self perform: ret message: [self buildSelector: end - 1 count: cp1 length: [self selectorLength: cp1 count: end]]];
+
+	/* Otherwise, chain each word as a sequential message */
+	cp1++;
+	while(cp1 < end && **cp1 != '\n')
+	{
+		if(**cp1 == '\0')
+			break;
+		ret = [self perform: ret message: *cp1];
+		cp1++;
+	}
+	return ret;
 }
 
 - (id) perform: (id) obj message: (const char *) msg
@@ -137,8 +151,6 @@
 	struct ArgumentList *argnew;
 	SEL sel;
 	IMP imp;
-	Method_t met;
-	Class cls;
 
 	i = 0;
 	for(argnew = self->argdef.next; argnew != &self->argdef; argnew = argnew->next)
@@ -152,15 +164,28 @@
 	for(argnew = self->argdef.next; argnew != &self->argdef; argnew = argnew->next)
 		arr[i++] = [self getObject: (const char *) argnew->arg];
 	sel = sel_register_name(msg);
-	cls = object_get_class(obj);
-	met = class_get_instance_method(cls, sel);
-	if(met == METHOD_NULL)
+
+	/* Special case: self returns the receiver */
+	if([self equalString: msg to: "self"])
+		return obj;
+
+	/* Disable GNUstep's forwarding hooks to prevent crashes on bad selectors,
+	 * then use objc_msg_lookup to find the method. Restore hooks afterward. */
+	{
+		IMP (*old_forward)(SEL) = __objc_msg_forward;
+		IMP (*old_forward2)(id, SEL) = __objc_msg_forward2;
+		__objc_msg_forward = NULL;
+		__objc_msg_forward2 = NULL;
+		imp = objc_msg_lookup(obj, sel);
+		__objc_msg_forward = old_forward;
+		__objc_msg_forward2 = old_forward2;
+	}
+	if(imp == NULL)
 	{
 		[self printString: "@"];
 		[self error: ": bad message" code: 255];
 		return nil;
 	}
-	imp = method_get_imp(met);
 	switch(i)
 	{
 	case 0:
@@ -192,33 +217,39 @@
 - (id) string: (char **) words count: (char **) end
 {
 	register char **cp1;
-	int had_args;
 
 	[self collectArguments: words count: end];
-	had_args = (self->argdef.next != &self->argdef);
-	if(!had_args)
+
+	/* If colon-terminated arguments exist, build keyword selector */
+	if(self->argdef.next != &self->argdef)
+		return [self perform: nil message: [self buildSelector: end - 1 count: words length: [self selectorLength: words count: end]]];
+
+	/* Check if there's a message after the string */
+	cp1 = words + 1;
+	while(cp1 < end && **cp1 != '\n' && **cp1 != '\0')
+		cp1++;
+
+	if(cp1 == words + 1)
 	{
-		/* Find last non-newline word */
-		char **last = end - 1;
-		while(last > words && **last == '\n')
-			last--;
-		if(last == words)
+		/* Bare string: print content without quotes (self-evaluating) */
+		register char *s = *words;
+		while(*s)
 		{
-			/* Single bare string: print content without quotes */
-			register char *s = *words;
-			while(*s)
-			{
-				if(*s != '\'')
-					[self putCharacter: *s & 0177];
-				s++;
-			}
-			self->output_done = 1;
-			return nil;
+			if(*s != '\'')
+				[self putCharacter: *s & 0177];
+			s++;
 		}
-		return [self perform: nil message: *words];
+		self->output_done = 1;
+		return nil;
 	}
-	cp1 = words;
-	return [self perform: nil message: [self buildSelector: end - 1 count: cp1 length: [self selectorLength: cp1 count: end]]];
+
+	/* Chain messages after the string */
+	cp1 = words + 1;
+	while(cp1 < end && **cp1 != '\n' && **cp1 != '\0')
+	{
+		return [self perform: nil message: *cp1];
+	}
+	return nil;
 }
 
 - (void) collectArguments: (char **) words count: (char **) end
