@@ -126,6 +126,8 @@ extern char line[LINSIZ];
 extern char *args[ARGSIZ];
 extern struct Tree trebuf[TRESIZ];
 extern jmp_buf jmp;
+extern struct ObjectList objdef;
+extern struct ArgumentList argdef;
 
 @interface Shell: Object
 + (int) argc: (int) c argv: (char *[]) av;
