@@ -33,9 +33,6 @@
 
 #import "objc_dyn.h"
 
-#define LINSIZ 1000
-#define ARGSIZ 50
-
 @interface Shell (Private)
 - (void) main;
 - (id) assignVar: (const char *) name value: (id) val;
@@ -51,27 +48,6 @@
 - (id) resolveName: (const char *) name;
 @end
 
-char *promp;
-char *linep;
-char *elinep;
-char **argp;
-char **eargp;
-int peekc;
-int gflg;
-int error;
-
-char line[LINSIZ];
-char *args[ARGSIZ];
-
-char pidp[NUMSIZ];
-char seta[26][EXPSIZ];
-char *dolp;
-int dolc;
-char **dolv;
-int idolp;
-int treec;
-jmp_buf jmp;
-
 static void c_trim(char *s)
 {
 	register char *dst, *src;
@@ -81,7 +57,7 @@ static void c_trim(char *s)
 	while(*src == ' ' || *src == '\t')
 		src++;
 	while(*src)
-		*dst++ = *src++;
+		*dst++ = *src++ & 0177;
 	*dst = '\0';
 	while(dst > s && (dst[-1] == ' ' || dst[-1] == '\t'))
 		dst--;
@@ -101,20 +77,19 @@ main(void)
 - (void) main
 {
 	[self loadClass: "Object"];
-	promp = "% ";
+	self->promp = "% ";
 	if(getuid() == 0)
-		promp = "# ";
+		self->promp = "# ";
 	if(!isatty(0))
-		promp = NULL;
+		self->promp = NULL;
 loop:
-	if(promp != NULL)
-		[self printString: promp];
-	if(!peekc)
-		peekc = [self getCharacter: DOLREPL];
-	if(peekc == '\n' || peekc == 0) {
-		/* End of input or empty line - reset and continue */
-		if(peekc == 0) exit(0);
-		peekc = 0;
+	if(self->promp != NULL)
+		[self printString: self->promp];
+	if(!self->peekc)
+		self->peekc = [self getCharacter: DOLREPL];
+	if(self->peekc == '\n' || self->peekc == 0) {
+		if(self->peekc == 0) exit(0);
+		self->peekc = 0;
 		goto loop;
 	}
 	[self main1];
@@ -126,17 +101,14 @@ loop:
 {
 	id val;
 
-	/* Check variable first */
 	val = [self getVariable: name];
 	if(val != nil)
 		return val;
 
-	/* Check class */
 	Class cls = [self getClass: name];
 	if(cls != Nil)
 		return (id) cls;
 
-	/* Check object */
 	id obj = [self getObject: name];
 	if(obj != nil)
 		return obj;
@@ -158,11 +130,12 @@ loop:
 - (id) executeAvs: (char **) avs ave: (char **) ave
 {
 	register char **cp1;
-	register char **cp2;
 	register id ret;
 	register int i;
 
 	cp1 = &avs[0];
+	while(cp1 < ave && **cp1 == '\n')
+		cp1++;
 	if(cp1 == ave)
 		return nil;
 
@@ -180,17 +153,14 @@ loop:
 		}
 	}
 
-	/* Check for missing message */
-	if([self equalString: cp1[1] to: "\n"])
+	/* Smalltalk symbol literal #symbol (self-evaluating) */
+	if((*cp1)[0] == '#')
 	{
-		/* Bare name: resolve and print */
-		ret = [self resolveName: *cp1];
-		if(ret != nil)
-		{
-			[self describeObject: ret];
-			return ret;
-		}
-		[self error: "missing message" code: 255];
+		id sym = [self internSymbol: *cp1 + 1];
+		[self printString: "#"];
+		[self printString: ((struct Symbol *)sym)->name];
+		[self putCharacter: '\n'];
+		self->output_done = 1;
 		return nil;
 	}
 
@@ -198,14 +168,24 @@ loop:
 	if([self scan: *cp1])
 		return [self stringAvs: cp1 ave: ave];
 
+	/* Check for missing message (bare name) */
+	if(cp1 + 1 >= ave || [self equalString: cp1[1] to: "\n"])
+	{
+		ret = [self resolveName: *cp1];
+		if(ret != nil)
+			return ret;
+		if(cp1 + 1 >= ave)
+			[self error: "missing message" code: 255];
+		return nil;
+	}
+
 	/* Resolve receiver name */
 	[self syntaxAvs: cp1 ave: ave];
 	ret = [self resolveName: *cp1];
 	if(ret == nil)
 		return nil;
 
-	/* Build keyword selector from arguments with : */
-	return [self execute1: ret msg: [self syntax2: ave cp1: cp1 len1: [self syntax1: cp1 ave: ave]]];
+	return [self execute1: ret msg: [self syntax2: ave - 1 cp1: cp1 len1: [self syntax1: cp1 ave: ave]]];
 }
 
 - (id) execute1: (id) obj msg: (const char *) msg
@@ -219,7 +199,7 @@ loop:
 	Class cls;
 
 	i = 0;
-	for(argnew = argdef.next; argnew != &argdef; argnew = argnew->next)
+	for(argnew = self->argdef.next; argnew != &self->argdef; argnew = argnew->next)
 		i++;
 	if(i > 9)
 	{
@@ -227,8 +207,8 @@ loop:
 		return nil;
 	}
 	i = 0;
-	for(argnew = argdef.next; argnew != &argdef; argnew = argnew->next)
-		arr[i++] = [self getObject: argnew->arg];
+	for(argnew = self->argdef.next; argnew != &self->argdef; argnew = argnew->next)
+		arr[i++] = [self getObject: (const char *) argnew->arg];
 	sel = sel_register_name(msg);
 	cls = object_get_class(obj);
 	met = class_get_instance_method(cls, sel);
@@ -269,20 +249,34 @@ loop:
 
 - (id) stringAvs: (char **) avs ave: (char **) ave
 {
-	register char *alloc;
-	register int len;
-	register id obj;
+	register char **cp1;
+	int had_args;
 
-	len = strlen(avs[0]);
-	alloc = malloc(len + 1);
-	(void) memcpy(alloc, avs[0], len);
-	c_trim(alloc);
-	obj = [[self getClass: "NSString"] stringWithCString: alloc];
-	free(alloc);
 	[self syntaxAvs: avs ave: ave];
-	if(argdef.next == &argdef)
-		return [self execute1: obj msg: avs[1]];
-	return [self execute1: obj msg: [self syntax2: ave cp1: avs len1: [self syntax1: avs ave: ave]]];
+	had_args = (self->argdef.next != &self->argdef);
+	if(!had_args)
+	{
+		/* Find last non-newline word */
+		char **last = ave - 1;
+		while(last > avs && **last == '\n')
+			last--;
+		if(last == avs)
+		{
+			/* Single bare string: print content without quotes */
+			register char *s = *avs;
+			while(*s)
+			{
+				if(*s != '\'')
+					[self putCharacter: *s & 0177];
+				s++;
+			}
+			self->output_done = 1;
+			return nil;
+		}
+		return [self execute1: nil msg: *avs];
+	}
+	cp1 = avs;
+	return [self execute1: nil msg: [self syntax2: ave - 1 cp1: cp1 len1: [self syntax1: cp1 ave: ave]]];
 }
 
 - (void) syntaxAvs: (char **) avs ave: (char **) ave
@@ -296,11 +290,11 @@ loop:
 		if([self lastCharacter: *av1] == ':')
 		{
 			argnew = malloc(sizeof *argnew);
-			argnew->next = &argdef;
-			argnew->prev = argdef.prev;
+			argnew->next = &self->argdef;
+			argnew->prev = self->argdef.prev;
 			argnew->arg = av1[1];
-			argdef.prev->next = argnew;
-			argdef.prev = argnew;
+			self->argdef.prev->next = argnew;
+			self->argdef.prev = argnew;
 		}
 }
 
@@ -344,29 +338,31 @@ loop:
 {
 	register char *cp;
 
-	argp = args;
-	eargp = args+ARGSIZ-1;
-	linep = line;
-	elinep = line+LINSIZ-1;
-	error = 0;
-	gflg = 0;
-	[self freeArgument: argdef.next];
+	self->argp = self->args;
+	self->eargp = self->args + ARGSIZ - 1;
+	self->linep = self->line;
+	self->elinep = self->line + LINSIZ - 1;
+	self->error = 0;
+	self->gflg = 0;
+	self->output_done = 0;
+	[self freeArgument: self->argdef.next];
 	do {
-		cp = linep;
+		cp = self->linep;
 		[self word];
 	} while(*cp != '\n');
-	if(gflg == 0) {
-		if(error != 0)
+	if(self->gflg == 0) {
+		if(self->error != 0)
 			[self error: "syntax error" code: 255];
 		else
 		{
 			register id obj;
 
-			/* Only execute if we read at least one word */
-			if(argp > args)
+			if(self->argp > self->args)
 			{
-				obj = [self executeAvs: args ave: argp - 1];
-				[self describeObject: obj];
+				obj = [self executeAvs: self->args ave: self->argp];
+				if(!self->output_done)
+					[self describeObject: obj];
+				self->output_done = 0;
 			}
 		}
 	}
@@ -375,14 +371,14 @@ loop:
 /* Smalltalk symbol literal #symbol */
 - (int) scan: (const char *) name
 {
-	return(*name == '\'' || *name == '"' || *name == '#');
+	return((*name & QUOTE) != 0);
 }
 
 - (void) word
 {
 	register int c, c1;
 
-	*argp++ = linep;
+	*self->argp++ = self->linep;
 
 loop:
 	switch(c = [self getCharacter: DOLREPL]) {
@@ -396,40 +392,38 @@ loop:
 		c1 = c;
 		while((c = [self getCharacter: !DOLREPL]) != c1) {
 			if(c == '\n') {
-				error++;
-				peekc = c;
+				self->error++;
+				self->peekc = c;
 				return;
 			}
-			*linep++ = c | QUOTE;
+			*self->linep++ = c | QUOTE;
 		}
 		goto pack;
 
 	case '#':
-		/* Symbol literal */
-		*linep++ = c;
+		*self->linep++ = c;
 		c = [self getCharacter: DOLREPL];
 		while(c != ' ' && c != '\t' && c != '\n' && c != ':' &&
 		      c != ';' && c != '&' && c != '|' && c != '<' &&
 		      c != '>' && c != '(' && c != ')' && c != '^') {
-			*linep++ = c;
+			*self->linep++ = c;
 			c = [self getCharacter: DOLREPL];
 		}
 		[self ungetCharacter: c];
-		*linep++ = '\0';
+		*self->linep++ = '\0';
 		return;
 
 	case ':':
-		/* Could be := or selector : */
 		c1 = [self getCharacter: DOLREPL];
 		if(c1 == '=') {
-			*linep++ = ':';
-			*linep++ = '=';
-			*linep++ = '\0';
+			*self->linep++ = ':';
+			*self->linep++ = '=';
+			*self->linep++ = '\0';
 			return;
 		}
 		[self ungetCharacter: c1];
-		*linep++ = c;
-		*linep++ = '\0';
+		*self->linep++ = c;
+		*self->linep++ = '\0';
 		return;
 
 	case '&':
@@ -441,26 +435,26 @@ loop:
 	case '|':
 	case '^':
 	case '\n':
-		*linep++ = c;
-		*linep++ = '\0';
+		*self->linep++ = c;
+		*self->linep++ = '\0';
 		return;
 	}
 
-	peekc = c;
+	self->peekc = c;
 
 pack:
 	for(;;) {
 		c = [self getCharacter: DOLREPL];
 		if([self anyCharacter: c in: " '\"\t;&<>()|^\n:"]) {
-			peekc = c;
+			self->peekc = c;
 			if([self anyCharacter: c in: "\"'"])
 				goto loop;
 			if(c == ':')
-				*linep++ = [self getCharacter: !DOLREPL];
-			*linep++ = '\0';
+				*self->linep++ = [self getCharacter: !DOLREPL];
+			*self->linep++ = '\0';
 			return;
 		}
-		*linep++ = c;
+		*self->linep++ = c;
 	}
 }
 
