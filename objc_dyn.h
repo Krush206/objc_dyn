@@ -189,6 +189,8 @@ struct Tree {
 - (void) resolveLinks;
 /* Dynamic loading via libdl */
 - (void) loadImage: (const char *) path;
+/* Declarable classes (Smalltalk: Superclass subclass: #Name) */
+- (id) declareClass: (Class) backing name: (const char *) name;
 /* Variable assignment and lookup */
 - (id) setVariable: (const char *) name value: (id) val;
 - (id) getVariable: (const char *) name;
