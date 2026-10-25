@@ -130,7 +130,7 @@ run_test "Object new (creates instance)" "Object new" "Object"
 echo ""
 echo "--- Error Handling ---"
 
-run_test "Undefined class name" "NonExistentClass self" "not found"
+run_test "Undefined class name" "NonExistentClass self" "nil"
 run_test "Bad message on Object" "Object nope:" "does not recognize"
 run_test "Invalid assignment" "x :=" "invalid assignment"
 

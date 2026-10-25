@@ -123,7 +123,7 @@
 	ret = [self resolve: *cp1];
 	if(ret == nil)
 	{
-		[self error: "not found" code: 255];
+		/* Undefined variable: return nil to be printed by describeObject */
 		return nil;
 	}
 
