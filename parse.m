@@ -176,16 +176,38 @@
 	if([self equalString: msg to: "self"])
 		return obj;
 
-	/* Disable GNUstep's forwarding hooks to prevent crashes on bad selectors,
-	 * then use objc_msg_lookup to find the method. Restore hooks afterward. */
+	/* Special case: alloc/new use class_create_instance directly.
+	 * Classic libobjc has no class-creation API, and GNUstep's alloc
+	 * crashes on dynamically loaded classes. class_create_instance
+	 * works for both statically and dynamically loaded classes. */
+	if([self equalString: msg to: "alloc"])
+		return class_create_instance((Class)obj);
+	if([self equalString: msg to: "new"])
+		return class_create_instance((Class)obj);
+
+	/* Look up the method implementation.
+	 * Class/meta-class receivers use objc_msg_lookup() — preserves
+	 * GNUstep's doesNotRecognize: fallback for unknown selectors
+	 * (test expects "does not recognize").  Instance receivers use
+	 * class_get_instance_method() — objc_msg_lookup on a class object
+	 * only finds class methods, not instance methods. */
 	{
 		IMP (*old_forward)(SEL) = __objc_msg_forward;
 		IMP (*old_forward2)(id, SEL) = __objc_msg_forward2;
-		__objc_msg_forward = NULL;
-		__objc_msg_forward2 = NULL;
-		imp = objc_msg_lookup(obj, sel);
-		__objc_msg_forward = old_forward;
-		__objc_msg_forward2 = old_forward2;
+
+		if (class_is_class((Class)obj) || class_is_meta_class((Class)obj))
+		{
+			__objc_msg_forward = NULL;
+			__objc_msg_forward2 = NULL;
+			imp = objc_msg_lookup((Class)obj, sel);
+			__objc_msg_forward = old_forward;
+			__objc_msg_forward2 = old_forward2;
+		}
+		else
+		{
+			Method_t m = class_get_instance_method(object_get_class(obj), sel);
+			imp = m ? m->method_imp : NULL;
+		}
 	}
 	if(imp == NULL)
 	{
@@ -193,6 +215,7 @@
 		[self error: ": bad message" code: 255];
 		return nil;
 	}
+
 	switch(i)
 	{
 	case 0:
