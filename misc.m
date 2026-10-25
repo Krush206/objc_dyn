@@ -152,7 +152,7 @@
 	}
 getd:
 	if(self->dolp) {
-		if (c = *self->dolp++) {
+		if ((c = *self->dolp++)) {
 			if (flag == DOLREPQ)
 				c |= QUOTE;
 			return c;
@@ -196,30 +196,6 @@ getd:
 - (void) ungetCharacter: (int) c
 {
 	self->ungetc_buf = c;
-}
-
-- (void) scan: (struct Tree *) at selector: (SEL) sel
-{
-	register char *p;
-	register char **t;
-	register int c;
-
-	t = at->DARR;
-	while((p = *t++))
-		while((c = *p))
-			;
-}
-
-- (int) glob: (int) c
-{
-	if([self anyCharacter: c in: "[?*"])
-		self->gflg = 1;
-	return(c);
-}
-
-- (int) trim: (int) c
-{
-	return(c & 0177);
 }
 
 - (char *) integerToASCII: (int) n
