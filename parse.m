@@ -32,7 +32,6 @@
  */
 
 #import "objc_dyn.h"
-#import <setjmp.h>
 
 @implementation Shell (Parser)
 
@@ -261,7 +260,7 @@
 			argnew = malloc(sizeof *argnew);
 			argnew->next = &self->argdef;
 			argnew->prev = self->argdef.prev;
-			argnew->arg = av1[1];
+			argnew->arg = (id)av1[1];
 			self->argdef.prev->next = argnew;
 			self->argdef.prev = argnew;
 		}
