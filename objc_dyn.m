@@ -271,6 +271,33 @@ static void dyn_load_callback(Class cls, Category *cat)
 	self->output_done = 1;
 }
 
+/* Declarable classes: register `name` backed by `backing` class,
+ * so `name self` resolves to the class and `name self new` makes instances. */
+- (id) declareClass: (Class) backing name: (const char *) name
+{
+	struct ClassList *clsnew;
+
+	if([self getClassRecord: name] != NULL)
+	{
+		[self error: "class already declared" code: 255];
+		return nil;
+	}
+	clsnew = malloc(sizeof *clsnew);
+	clsnew->cls = backing;
+	clsnew->super = class_get_super_class(backing);
+	clsnew->root = [self getRootClass: backing];
+	clsnew->meta = class_get_meta_class(backing);
+	clsnew->name = strcpy(malloc(strlen(name) + 1), name);
+	clsnew->next = &self->clsdef;
+	clsnew->prev = self->clsdef.prev;
+	self->clsdef.prev->next = clsnew;
+	self->clsdef.prev = clsnew;
+	[self printString: name];
+	[self printString: "\n"];
+	self->output_done = 1;
+	return nil;
+}
+
 /* Variable assignment and lookup */
 - (id) setVariable: (const char *) name value: (id) val
 {
