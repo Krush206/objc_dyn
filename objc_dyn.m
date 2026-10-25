@@ -1,5 +1,23 @@
 #import "objc_dyn.h"
 
+#include <dlfcn.h>
+
+extern void (*_objc_load_callback)(Class, Category *);
+
+/* Classes loaded dynamically via libdl are registered here so resolve: can
+ * find them.  The _objc_load_callback fires during dlopen() for every class
+ * registered by __objc_exec_class in the loaded image. */
+static void *loaded_images[64];
+static int loaded_image_count = 0;
+static Class loaded_classes[64];
+static int loaded_class_count = 0;
+
+static void dyn_load_callback(Class cls, Category *cat)
+{
+	if (loaded_class_count < 64)
+		loaded_classes[loaded_class_count++] = cls;
+}
+
 @implementation Shell (Runtime)
 - (void) allocRootClass: (struct RootList *) rootnew
 {
@@ -114,7 +132,28 @@
 	/* Fall back to direct runtime lookup via objc_lookup_class()
 	 * — avoids walking objc_next_class() which segfaults with
 	 * GNUstep Base metadata under classic libobjc. */
-	return objc_lookup_class(clsname);
+	{
+		Class cls = objc_lookup_class(clsname);
+		if (cls != Nil)
+			return cls;
+	}
+
+	/* Dynamic loading: try dlopen("<name>.so") as a last resort.
+	 * Classic libobjc has no class-creation API, so real classes must
+	 * come from shared objects loaded via libdl. */
+	{
+		char path[CMDSIZ];
+		snprintf(path, sizeof path, "./%s.so", clsname);
+		if (access(path, F_OK) == 0)
+			[self loadImage: path];
+		else
+		{
+			snprintf(path, sizeof path, "%s.so", clsname);
+			if (access(path, F_OK) == 0)
+				[self loadImage: path];
+		}
+		return objc_lookup_class(clsname);
+	}
 }
 
 - (id) getObject: (const char *) objname
@@ -180,6 +219,56 @@
 	extern void __objc_resolve_class_links(void);
 
 	__objc_resolve_class_links();
+}
+
+/* Dynamically load a shared library (via libdl) and register every Objective-C
+ * class it registers with the runtime, so resolve: can find them by name. */
+- (void) loadImage: (const char *) path
+{
+	void *handle;
+	void (*old_callback)(Class, Category *) = _objc_load_callback;
+	int i;
+	int start_count = loaded_class_count;
+
+	_objc_load_callback = dyn_load_callback;
+	handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+	_objc_load_callback = old_callback;
+
+	if (!handle)
+	{
+		[self printString: dlerror()];
+		[self putCharacter: '\n'];
+		return;
+	}
+
+	if (loaded_image_count < 64)
+		loaded_images[loaded_image_count++] = handle;
+
+	/* Register every class the loaded image registered with the runtime */
+	for (i = start_count; i < loaded_class_count; i++)
+	{
+		Class cls = loaded_classes[i];
+		const char *name = class_get_class_name(cls);
+		struct ClassList *clsnew;
+
+		if (!name || *name == '\0')
+			continue;
+		if ([self getClassRecord: name] != NULL)
+			continue;
+		clsnew = malloc(sizeof *clsnew);
+		clsnew->cls = cls;
+		clsnew->super = class_get_super_class(cls);
+		clsnew->root = [self getRootClass: cls];
+		clsnew->meta = class_get_meta_class(cls);
+		clsnew->name = strcpy(malloc(strlen(name) + 1), name);
+		clsnew->next = &self->clsdef;
+		clsnew->prev = self->clsdef.prev;
+		self->clsdef.prev->next = clsnew;
+		self->clsdef.prev = clsnew;
+		[self printString: name];
+		[self printString: "\n"];
+	}
+	self->output_done = 1;
 }
 
 /* Variable assignment and lookup */
