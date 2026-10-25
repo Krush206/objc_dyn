@@ -141,6 +141,29 @@ run_multi_test "Assign then message chain" \
     "Object" \
     "c := Object self" "c self new"
 
+# --- Test Group 9: Declarable Classes ---
+echo ""
+echo "--- Declarable Classes (Smalltalk subclass: #Name) ---"
+
+run_multi_test "Declare MyClass subclass of Object" \
+    "MyClass" \
+    "Object subclass: #MyClass"
+
+run_multi_test "Declared class resolves via self" \
+    "Object" \
+    "Object subclass: #MyClass" \
+    "MyClass self"
+
+run_multi_test "Declared class creates instance" \
+    "Object" \
+    "Object subclass: #MyClass" \
+    "MyClass self new"
+
+run_multi_test "Duplicate declaration errors" \
+    "class already declared" \
+    "Object subclass: #MyClass" \
+    "Object subclass: #MyClass"
+
 echo ""
 echo "========================================="
 echo "  Results: $pass passed, $fail failed"
