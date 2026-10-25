@@ -8,6 +8,7 @@
 #import <signal.h>
 #import <setjmp.h>
 #import <errno.h>
+#import <dlfcn.h>
 #import "/usr/local/include/objc/Object.h"
 #import "/usr/local/include/objc/objc-api.h"
 
@@ -186,6 +187,8 @@ struct Tree {
 - (struct ArgumentList *) getArgumentList;
 - (void) freeArgument: (struct ArgumentList *) argnew;
 - (void) resolveLinks;
+/* Dynamic loading via libdl */
+- (void) loadImage: (const char *) path;
 /* Variable assignment and lookup */
 - (id) setVariable: (const char *) name value: (id) val;
 - (id) getVariable: (const char *) name;
