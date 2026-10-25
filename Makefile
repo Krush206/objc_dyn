@@ -1,18 +1,34 @@
-CC = gcc
-CFLAGS = -Wall -O2 -I/usr/local/GNUstep/Local/Library/Headers
-LDIR = /usr/local/GNUstep/Local/Library/Libraries
-LIBOBJC = -lobjc
-LIBBASE = -lgnustep-base
+# Object-oriented shell — classic libobjc + GNUstep Base
+#
+# Builds `sh` from Objective-C sources against the classic GNUstep
+# libobjc runtime with GNUstep Base 1.18.0 force-linked.
 
-OBJS = sh.o objc_dyn.o misc.o lex.o parse.o
+CC       = gcc
+CPPFLAGS = -I/usr/local/GNUstep/Local/Library/Headers
+CFLAGS   = -Wall -O2
+LDFLAGS  = -L/usr/local/GNUstep/Local/Library/Libraries \
+           -Wl,-rpath,/usr/local/GNUstep/Local/Library/Libraries \
+           -Wl,--no-as-needed \
+           -Wl,-u,GSAllocMethodList
+LDLIBS   = -lgnustep-base -lobjc -lm
 
-sh: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) -L$(LDIR) -Wl,--no-as-needed $(LIBBASE) $(LIBOBJC) -Wl,-rpath,$(LDIR)
+SRC = sh.m objc_dyn.m misc.m lex.m parse.m
+OBJ = $(SRC:.m=.o)
+HDR = objc_dyn.h
 
-%.o: %.m objc_dyn.h
-	$(CC) $(CFLAGS) -c $< -o $@
+all: sh
+
+sh: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LDLIBS)
+
+%.o: %.m $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+test: sh
+	bash test.sh
+	bash test_gst.sh
 
 clean:
-	rm -f sh *.o
+	rm -f sh $(OBJ)
 
-.PHONY: clean
+.PHONY: all test clean
