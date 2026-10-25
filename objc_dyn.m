@@ -83,6 +83,7 @@
 	self->objdef.prev = &self->objdef;
 	self->rootdef.next = &self->rootdef;
 	self->rootdef.prev = &self->rootdef;
+	self->subchar = '$';
 	[self setRootClass: rootname];
 	loaded = 1;
 }
