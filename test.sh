@@ -4,9 +4,14 @@
 # Tests classic libobjc integration with GNUstep Base 1.18.0,
 # Smalltalk syntax (:=, #, :), message chaining, and OO message passing.
 #
-# Syntax: every entry is `receiver message` or `receiver msg1 msg2 ...`
-# The `self` message returns the receiver (enables chaining).
-# `Object self new` → send `self` to Object (get class), then `new` (create instance).
+# STRICT SYNTAX: All objects (even classes) require a message.
+#   receiver message           — valid
+#   receiver msg1 msg2 ...    — valid (chaining)
+#   receiver                   — ERROR "missing message"
+#   x := receiver              — ERROR (RHS needs message)
+#   x := receiver self         — valid
+#
+# The `self` message returns the receiver (enables chaining and value retrieval).
 
 cd /opt/objc_dyn || exit 1
 
@@ -61,7 +66,7 @@ run_multi_test() {
 
 echo "========================================="
 echo "  Object-Oriented Shell Test Suite"
-echo "  Message Chaining Syntax: receiver msg1 msg2 ..."
+echo "  Strict: All objects require a message"
 echo "========================================="
 echo ""
 
@@ -74,34 +79,45 @@ run_test "NSString self" "NSString self" "NSString"
 run_test "NSDictionary self" "NSDictionary self" "NSDictionary"
 run_test "NSNumber self" "NSNumber self" "NSNumber"
 
-# --- Test Group 2: Smalltalk Symbol Literals ---
+# --- Test Group 2: Bare Names Error (strict syntax) ---
 echo ""
-echo "--- Smalltalk Symbol Literals ---"
+echo "--- Bare Names Error ---"
+
+run_test "Bare NSObject errors" "NSObject" "missing message"
+run_test "Bare Object errors" "Object" "missing message"
+run_test "Bare NSString errors" "NSString" "missing message"
+
+# --- Test Group 3: Smalltalk Symbol Literals ---
+echo ""
+echo "--- Smalltalk Symbol Literals (self-evaluating) ---"
 
 run_test "Symbol #foo" '#foo' "#foo"
 run_test "Symbol #bar" '#bar' "#bar"
 run_test "Symbol #helloWorld" '#helloWorld' "#helloWorld"
 
-# --- Test Group 3: String Literals ---
+# --- Test Group 4: String Literals ---
 echo ""
 echo "--- String Literals ---"
 
-run_test "Single-quoted string" "'hello world'" "hello world"
-run_test "Double-quoted string" '"hello world"' "hello world"
+run_test "Bare string errors" "'hello world'" "missing message"
 
-# --- Test Group 4: Variable Assignment ---
+# --- Test Group 5: Variable Assignment ---
 echo ""
-echo "--- Variable Assignment ---"
+echo "--- Variable Assignment (Smalltalk :=) ---"
 
-run_multi_test "Assign Object to x then retrieve via self" \
+run_multi_test "Assign Object to x, retrieve via self" \
     "Object" \
-    "x := Object" "x self"
+    "x := Object self" "x self"
 
-run_multi_test "Assign NSString to s then retrieve" \
+run_multi_test "Assign NSString to s, retrieve via self" \
     "NSString" \
-    "s := NSString" "s self"
+    "s := NSString self" "s self"
 
-# --- Test Group 5: Message Chaining ---
+run_test "x := Object (no message on RHS) errors" \
+    "x := Object" \
+    "missing message"
+
+# --- Test Group 6: Message Chaining ---
 echo ""
 echo "--- Message Chaining (receiver msg1 msg2 ...) ---"
 
@@ -109,7 +125,7 @@ run_test "Object self (returns class)" "Object self" "Object"
 run_test "Object self new (creates instance)" "Object self new" "Object"
 run_test "Object new (creates instance)" "Object new" "Object"
 
-# --- Test Group 6: Error Handling ---
+# --- Test Group 7: Error Handling ---
 echo ""
 echo "--- Error Handling ---"
 
@@ -117,13 +133,13 @@ run_test "Undefined class name" "NonExistentClass self" "not found"
 run_test "Bad message on Object" "Object nope:" "does not recognize"
 run_test "Invalid assignment" "x :=" "invalid assignment"
 
-# --- Test Group 7: Composite Operations ---
+# --- Test Group 8: Composite Operations ---
 echo ""
 echo "--- Composite Operations ---"
 
 run_multi_test "Assign then message chain" \
     "Object" \
-    "c := Object" "c self new"
+    "c := Object self" "c self new"
 
 echo ""
 echo "========================================="
