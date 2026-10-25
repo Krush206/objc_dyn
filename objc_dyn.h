@@ -153,7 +153,6 @@ struct Tree {
 }
 
 + (int) argc: (int) c argv: (char *[]) av;
-- (void) main;
 @end
 
 @interface Shell (Miscellaneous)
@@ -167,16 +166,8 @@ struct Tree {
 - (int) lastCharacter: (char *) cp;
 - (int) getCharacter: (int) flag;
 - (void) ungetCharacter: (int) c;
-- (void) scan: (struct Tree *) at selector: (SEL) sel;
-- (int) glob: (int) c;
-- (int) trim: (int) c;
 - (char *) integerToASCII: (int) n;
 - (id) describeObject: (id) obj;
-/* Variable assignment and lookup */
-- (id) setVariable: (const char *) name value: (id) val;
-- (id) getVariable: (const char *) name;
-/* Symbol support */
-- (id) internSymbol: (const char *) name;
 @end
 
 @interface Shell (Runtime)
@@ -195,6 +186,11 @@ struct Tree {
 - (struct ArgumentList *) getArgumentList;
 - (void) freeArgument: (struct ArgumentList *) argnew;
 - (void) resolveLinks;
+/* Variable assignment and lookup */
+- (id) setVariable: (const char *) name value: (id) val;
+- (id) getVariable: (const char *) name;
+/* Symbol support */
+- (id) internSymbol: (const char *) name;
 @end
 
 @interface Shell (Lexer)
@@ -215,6 +211,5 @@ struct Tree {
 - (int) selectorLength: (char **) words count: (char **) end;
 - (char *) buildSelector: (char **) words count: (char **) end length: (int) len;
 - (id) resolve: (const char *) name;
-- (id) parseMessage: (char **) p1 end: (char **) p2;
 @end
 #endif /* !OBJC_DYN */
