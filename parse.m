@@ -134,11 +134,19 @@
 
 	/* Otherwise, chain each word as a sequential message */
 	cp1++;
-	while(cp1 < end && **cp1 != '\n')
+
+	/* Every entry requires at least one message */
+	if(cp1 >= end || **cp1 == '\n' || **cp1 == '\0')
 	{
-		if(**cp1 == '\0')
-			break;
+		[self error: "missing message" code: 255];
+		return nil;
+	}
+
+	while(cp1 < end && **cp1 != '\n' && **cp1 != '\0')
+	{
 		ret = [self perform: ret message: *cp1];
+		if(ret == nil && self->error)
+			return nil;
 		cp1++;
 	}
 	return ret;
@@ -224,27 +232,15 @@
 	if(self->argdef.next != &self->argdef)
 		return [self perform: nil message: [self buildSelector: end - 1 count: words length: [self selectorLength: words count: end]]];
 
-	/* Check if there's a message after the string */
+	/* Every string requires a message (like all objects) */
 	cp1 = words + 1;
-	while(cp1 < end && **cp1 != '\n' && **cp1 != '\0')
-		cp1++;
-
-	if(cp1 == words + 1)
+	if(cp1 >= end || **cp1 == '\n' || **cp1 == '\0')
 	{
-		/* Bare string: print content without quotes (self-evaluating) */
-		register char *s = *words;
-		while(*s)
-		{
-			if(*s != '\'')
-				[self putCharacter: *s & 0177];
-			s++;
-		}
-		self->output_done = 1;
+		[self error: "missing message" code: 255];
 		return nil;
 	}
 
 	/* Chain messages after the string */
-	cp1 = words + 1;
 	while(cp1 < end && **cp1 != '\n' && **cp1 != '\0')
 	{
 		return [self perform: nil message: *cp1];
@@ -312,6 +308,16 @@
 	register char *cp;
 
 	[self loadClass: "Object"];
+	self->promp = "% ";
+	if(getuid() == 0)
+		self->promp = "# ";
+	if(!isatty(0))
+		self->promp = NULL;
+
+loop:
+	if(self->promp != NULL)
+		[self printString: self->promp];
+
 	self->argp = self->args;
 	self->eargp = self->args + ARGSIZ - 1;
 	self->linep = self->line;
@@ -340,5 +346,6 @@
 			}
 		}
 	}
+	goto loop;
 }
 @end
