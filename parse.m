@@ -176,6 +176,15 @@
 	if([self equalString: msg to: "self"])
 		return obj;
 
+	/* Special case: class declaration "Superclass subclass: #Name" */
+	if([self equalString: msg to: "subclass:"] && i == 1)
+	{
+		struct ArgumentList *a = self->argdef.next;
+		const char *name = (const char *) a->arg;
+		if(name != NULL && name[0] == '#')
+			return [self declareClass: obj name: name + 1];
+	}
+
 	/* Special case: alloc/new use class_create_instance directly.
 	 * Classic libobjc has no class-creation API, and GNUstep's alloc
 	 * crashes on dynamically loaded classes. class_create_instance
