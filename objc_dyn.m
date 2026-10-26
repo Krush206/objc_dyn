@@ -1,145 +1,237 @@
 #import "objc_dyn.h"
 
-static struct Class clsdef;
-static struct Root rootdef;
-static char *clsroot;
+static struct {
+	struct ClassList clsdef;
+	struct RootList rootdef;
+	struct ObjectList objdef;
+	struct ArgumentList argdef;
+	char *clsroot;
+} lbuf;
 
-static void loadRootClass(struct Class *clsnew)
+@implementation Shell (Runtime)
+- (void) allocRootClass: (struct RootList *) rootnew
 {
-  struct Root *rootnew;
-  struct Root *roothead;
+	struct RootList *roothead;
 
-  if(clsnew != &clsdef)
-    loadRootClass(clsnew->next);
-  rootnew = rootdef.next;
-  while(rootnew != &rootdef)
-  {
-    if(rootnew->cls == clsnew->root)
-      return;
-    rootnew = rootnew->next;
-  }
-  roothead = rootnew;
-  rootnew = malloc(sizeof *rootnew);
-  rootnew->next = &rootdef;
-  rootnew->prev = roothead;
-  roothead->next = rootnew;
-  rootnew->cls = clsnew->root;
-  rootnew->name = class_getName(clsnew->root);
+	roothead = &lbuf.rootdef;
+	roothead->next = roothead;
+	roothead->prev = roothead;
+	while(rootnew != &lbuf.rootdef)
+	{
+		struct RootList *alloc;
+
+		alloc = malloc(sizeof *alloc);
+		alloc->next = &lbuf.rootdef;
+		alloc->prev = roothead;
+		alloc->cls = rootnew->cls;
+		alloc->meta = rootnew->meta;
+		alloc->name = rootnew->name;
+		lbuf.rootdef.prev = alloc;
+		roothead->next = alloc;
+		roothead = alloc;
+		rootnew = rootnew->next;
+	}
 }
 
-void loadClass(void)
+- (void) forEachRootClass: (struct RootList *) rootnew
 {
-  unsigned int i;
-  Class *cls;
-  struct Class *clsnew;
-  struct Class *clshead;
-  struct Root *rootnew;
-  static int loaded;
+	struct RootList *roothead;
 
-  if(loaded)
-    return;
-  cls = objc_copyClassList(&i);
-  clsnew = &clsdef;
-  clsnew->next = clsnew;
-  clsnew->prev = clsnew;
-  clshead = clsnew;
-  while(i--)
-  {
-    clsnew = malloc(sizeof *clsnew);
-    clsnew->cls = cls[i];
-    clsnew->name = class_getName(clsnew->cls);
-    clsnew->super = class_getSuperclass(clsnew->cls);
-    clsnew->root = getRootClass(clsnew->cls);
-    clsnew->next = &clsdef;
-    clsnew->prev = clshead;
-    clsdef.prev = clsnew;
-    clshead->next = clsnew;
-    clshead = clsnew;
-  }
-  free(cls);
-  rootnew = &rootdef;
-  rootnew->next = rootnew;
-  rootnew->prev = rootnew;
-  loadRootClass(clsdef.next);
-  setRootClass("NSObject");
-  loaded = 1;
+	if(rootnew == &lbuf.rootdef)
+		return;
+	for(roothead = rootnew->next;
+	    roothead != rootnew;
+	    roothead = roothead->next)
+		if(roothead->cls == rootnew->cls)
+		{
+			rootnew->prev->next = rootnew->next;
+			rootnew->next->prev = rootnew->prev;
+			break;
+		}
+	[self forEachRootClass: rootnew->next];
 }
 
-Class getRootClass(Class cls)
+- (void) loadRootClass: (struct RootList *) rootnew
+	 class: (struct ClassList *) clsnew
 {
-  Class clsnew;
+	struct RootList roothead;
 
-  do
-  {
-    clsnew = cls;
-    cls = class_getSuperclass(cls);
-  }
-  while(cls != Nil);
-
-  return clsnew;
+	if(clsnew == &lbuf.clsdef)
+	{
+		[self forEachRootClass: lbuf.rootdef.next];
+		[self allocRootClass: lbuf.rootdef.next];
+		return;
+	}
+	roothead.next = &lbuf.rootdef;
+	roothead.prev = rootnew;
+	roothead.cls = clsnew->root;
+	roothead.meta = class_get_meta_class(clsnew->root);
+	roothead.name = class_get_class_name(clsnew->root);
+	lbuf.rootdef.prev = &roothead;
+	rootnew->next = &roothead;
+	[self loadRootClass: &roothead class: clsnew->next];
 }
 
-Class getClass(const char *name)
+- (void) loadClass: (const char *) rootname
 {
-  struct Class *oclsdef;
+	static int loaded;
 
-  oclsdef = clsdef;
-  do
-    if(strcmp(name, clsdef->name) == 0 &&
-       strcmp(clsroot, class_getName(clsdef->root)) == 0)
-      return clsdef->cls;
-  while((clsdef = clsdef->next) != oclsdef);
-
-  return Nil;
+	if(loaded)
+		return;
+	/* Don't walk all classes via objc_next_class() — that calls
+	 * class_get_super_class() on GNUstep Base metadata which is
+	 * ABI-incompatible with classic libobjc and segfaults.
+	 * Instead, initialize the data structures and let getClass:
+	 * resolve names via objc_lookup_class() on demand. */
+	lbuf.clsdef.next = &lbuf.clsdef;
+	lbuf.clsdef.prev = &lbuf.clsdef;
+	lbuf.argdef.next = &lbuf.argdef;
+	lbuf.argdef.prev = &lbuf.argdef;
+	lbuf.objdef.next = &lbuf.objdef;
+	lbuf.objdef.prev = &lbuf.objdef;
+	lbuf.rootdef.next = &lbuf.rootdef;
+	lbuf.rootdef.prev = &lbuf.rootdef;
+	[self setRootClass: rootname];
+	loaded = 1;
 }
 
-void setRootClass(const char *new)
+- (Class) getRootClass: (Class) cls
 {
-  free(clsroot);
-  clsroot = strcpy(malloc(strlen(new) + 1), new);
+	Class clsnew;
+
+	do
+	{
+		clsnew = cls;
+		cls = class_get_super_class(cls);
+	}
+	while(cls != Nil);
+	return clsnew;
 }
 
-void inheritCopy(Class from, Class to)
+- (Class) getClass: (const char *) clsname
 {
-  unsigned int i;
-  Method *meth;
+	struct ClassList *clsnew;
 
-  meth = class_copyMethodList(from, &i);
-  while(i--)
-    (void) class_addMethod(to, method_getName(meth[i]),
-			   method_getImplementation(meth[i]),
-			   method_getTypeEncoding(meth[i]));
-  free(meth);
-  meth = class_copyMethodList(object_getClass(from), &i);
-  while(i--)
-    (void) class_addMethod(to, method_getName(meth[i]),
-			   method_getImplementation(meth[i]),
-			   method_getTypeEncoding(meth[i]));
-  free(meth);
+	/* Check the registry first (for explicitly defined classes) */
+	for(clsnew = lbuf.clsdef.next; clsnew != &lbuf.clsdef; clsnew = clsnew->next)
+		if([self equalString: clsname to: clsnew->name] &&
+		   [self equalString: self->clsroot to: class_get_class_name(clsnew->root)])
+			return clsnew->cls;
+
+	/* Fall back to direct runtime lookup via objc_lookup_class()
+	 * — avoids walking objc_next_class() which segfaults with
+	 * GNUstep Base metadata under classic libobjc. */
+	return objc_lookup_class(clsname);
 }
 
-void setClass(struct Class *cls)
+- (id) getObject: (const char *) objname
 {
-  objc_registerClassPair(cls->cls = objc_allocateClassPair(cls->super,
-							   cls->name,
-							   0));
+	struct ObjectList *objnew;
+
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
+		if([self equalString: objname to: objnew->name])
+			return objnew->obj;
+	return nil;
 }
 
-void newRoot(struct Class *cls)
+- (struct ObjectList *) getObjectRecord: (const char *) objname
 {
-  struct Class *oclsdef, clsnew;
+	struct ObjectList *objnew;
 
-  oclsdef = clsdef;
-  do
-    if(clsdef->cls == cls->cls)
-      break;
-  while((clsdef = clsdef->next) != oclsdef);
-  clsdef = oclsdef;
-  clsnew.cls = cls->cls;
-  setClass(cls);
-  clsnew.super = cls->cls;
-  clsnew.name = clsdef->name;
-  clsnew.next = clsnew.prev = clsdef;
-  setClass(&clsnew);
-  inheritCopy(cls->root, clsnew.cls);
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
+		if([self equalString: objname to: objnew->name])
+			return objnew;
+	return NULL;
 }
+
+- (struct ClassList *) getClassRecord: (const char *) clsname
+{
+	struct ClassList *clsnew;
+
+	for(clsnew = lbuf.clsdef.next; clsnew != &lbuf.clsdef; clsnew = clsnew->next)
+		if([self equalString: clsname to: clsnew->name])
+			return clsnew;
+	return NULL;
+}
+
+- (void) setRootClass: (const char *) new
+{
+	free(self->clsroot);
+	self->clsroot = strcpy(malloc(strlen(new) + 1), new);
+}
+
+- (struct ObjectList *) getObjectList
+{
+	return &lbuf.objdef;
+}
+
+- (struct ArgumentList *) getArgumentList
+{
+	return &lbuf.argdef;
+}
+
+- (void) freeArgument: (struct ArgumentList *) argnew
+{
+	if(argnew == &lbuf.argdef)
+	{
+		argnew->next = argnew;
+		argnew->prev = argnew;
+		return;
+	}
+	[self freeArgument: argnew->next];
+	free(argnew);
+}
+
+- (void) resolveLinks
+{
+	extern void __objc_resolve_class_links(void);
+
+	__objc_resolve_class_links();
+}
+
+/* Variable assignment and lookup */
+- (id) setVariable: (const char *) name value: (id) val
+{
+	struct ObjectList *obj;
+
+	if((obj = [self getObjectRecord: name]) != NULL)
+	{
+		obj->obj = val;
+		return val;
+	}
+	obj = malloc(sizeof *obj);
+	obj->next = &lbuf.objdef;
+	obj->prev = lbuf.objdef.prev;
+	obj->name = strcpy(malloc(strlen(name) + 1), name);
+	obj->obj = val;
+	lbuf.objdef.prev->next = obj;
+	lbuf.objdef.prev = obj;
+	return val;
+}
+
+- (id) getVariable: (const char *) name
+{
+	struct ObjectList *objnew;
+
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
+		if([self equalString: name to: objnew->name])
+			return objnew->obj;
+	return nil;
+}
+
+/* Symbol support */
+- (id) internSymbol: (const char *) name
+{
+	static struct Symbol *symbols = NULL;
+	struct Symbol *sym;
+
+	for(sym = symbols; sym != NULL; sym = sym->next)
+		if([self equalString: name to: sym->name])
+			return (id) sym;
+	sym = malloc(sizeof *sym);
+	sym->name = strcpy(malloc(strlen(name) + 1), name);
+	sym->next = symbols;
+	symbols = sym;
+	return (id) sym;
+}
+@end
