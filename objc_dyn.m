@@ -1,24 +1,31 @@
 #import "objc_dyn.h"
 
+static struct {
+	struct ClassList clsdef;
+	struct RootList rootdef;
+	struct ObjectList objdef;
+	char *clsroot;
+} lbuf;
+
 @implementation Shell (Runtime)
 - (void) allocRootClass: (struct RootList *) rootnew
 {
 	struct RootList *roothead;
 
-	roothead = &self->rootdef;
+	roothead = &lbuf.rootdef;
 	roothead->next = roothead;
 	roothead->prev = roothead;
-	while(rootnew != &self->rootdef)
+	while(rootnew != &lbuf.rootdef)
 	{
 		struct RootList *alloc;
 
 		alloc = malloc(sizeof *alloc);
-		alloc->next = &self->rootdef;
+		alloc->next = &lbuf.rootdef;
 		alloc->prev = roothead;
 		alloc->cls = rootnew->cls;
 		alloc->meta = rootnew->meta;
 		alloc->name = rootnew->name;
-		self->rootdef.prev = alloc;
+		lbuf.rootdef.prev = alloc;
 		roothead->next = alloc;
 		roothead = alloc;
 		rootnew = rootnew->next;
@@ -29,7 +36,7 @@
 {
 	struct RootList *roothead;
 
-	if(rootnew == &self->rootdef)
+	if(rootnew == &lbuf.rootdef)
 		return;
 	for(roothead = rootnew->next;
 	    roothead != rootnew;
@@ -50,16 +57,16 @@
 
 	if(clsnew == &self->clsdef)
 	{
-		[self forEachRootClass: self->rootdef.next];
-		[self allocRootClass: self->rootdef.next];
+		[self forEachRootClass: lbuf.rootdef.next];
+		[self allocRootClass: lbuf.rootdef.next];
 		return;
 	}
-	roothead.next = &self->rootdef;
+	roothead.next = &lbuf.rootdef;
 	roothead.prev = rootnew;
 	roothead.cls = clsnew->root;
 	roothead.meta = class_get_meta_class(clsnew->root);
 	roothead.name = class_get_class_name(clsnew->root);
-	self->rootdef.prev = &roothead;
+	lbuf.rootdef.prev = &roothead;
 	rootnew->next = &roothead;
 	[self loadRootClass: &roothead class: clsnew->next];
 }
@@ -79,10 +86,10 @@
 	self->clsdef.prev = &self->clsdef;
 	self->argdef.next = &self->argdef;
 	self->argdef.prev = &self->argdef;
-	self->objdef.next = &self->objdef;
-	self->objdef.prev = &self->objdef;
-	self->rootdef.next = &self->rootdef;
-	self->rootdef.prev = &self->rootdef;
+	lbuf.objdef.next = &lbuf.objdef;
+	lbuf.objdef.prev = &lbuf.objdef;
+	lbuf.rootdef.next = &lbuf.rootdef;
+	lbuf.rootdef.prev = &lbuf.rootdef;
 	self->subchar = '$';
 	[self setRootClass: rootname];
 	loaded = 1;
@@ -121,7 +128,7 @@
 {
 	struct ObjectList *objnew;
 
-	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
 		if([self equalString: objname to: objnew->name])
 			return objnew->obj;
 	return nil;
@@ -131,7 +138,7 @@
 {
 	struct ObjectList *objnew;
 
-	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
 		if([self equalString: objname to: objnew->name])
 			return objnew;
 	return NULL;
@@ -155,7 +162,7 @@
 
 - (struct ObjectList *) getObjectList
 {
-	return &self->objdef;
+	return &lbuf.objdef;
 }
 
 - (struct ArgumentList *) getArgumentList
@@ -193,12 +200,12 @@
 		return val;
 	}
 	obj = malloc(sizeof *obj);
-	obj->next = &self->objdef;
-	obj->prev = self->objdef.prev;
+	obj->next = &lbuf.objdef;
+	obj->prev = lbuf.objdef.prev;
 	obj->name = strcpy(malloc(strlen(name) + 1), name);
 	obj->obj = val;
-	self->objdef.prev->next = obj;
-	self->objdef.prev = obj;
+	lbuf.objdef.prev->next = obj;
+	lbuf.objdef.prev = obj;
 	return val;
 }
 
@@ -206,7 +213,7 @@
 {
 	struct ObjectList *objnew;
 
-	for(objnew = self->objdef.next; objnew != &self->objdef; objnew = objnew->next)
+	for(objnew = lbuf.objdef.next; objnew != &lbuf.objdef; objnew = objnew->next)
 		if([self equalString: name to: objnew->name])
 			return objnew->obj;
 	return nil;
