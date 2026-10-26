@@ -47,7 +47,7 @@ main(int c, char *av[])
 	register id obj;
 	int f;
 
-	sh = class_create_instance(self);
+	sh = [self new];
 	(void) [sh getTreeCount];
 	(void) [sh getErrorValue];
 	(void) [sh getCurrentDollarPointer];
