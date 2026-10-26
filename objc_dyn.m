@@ -4,6 +4,7 @@ static struct {
 	struct ClassList clsdef;
 	struct RootList rootdef;
 	struct ObjectList objdef;
+	struct ArgumentList argdef;
 	char *clsroot;
 } lbuf;
 
@@ -55,7 +56,7 @@ static struct {
 {
 	struct RootList roothead;
 
-	if(clsnew == &self->clsdef)
+	if(clsnew == &lbuf.clsdef)
 	{
 		[self forEachRootClass: lbuf.rootdef.next];
 		[self allocRootClass: lbuf.rootdef.next];
@@ -82,15 +83,14 @@ static struct {
 	 * ABI-incompatible with classic libobjc and segfaults.
 	 * Instead, initialize the data structures and let getClass:
 	 * resolve names via objc_lookup_class() on demand. */
-	self->clsdef.next = &self->clsdef;
-	self->clsdef.prev = &self->clsdef;
-	self->argdef.next = &self->argdef;
-	self->argdef.prev = &self->argdef;
+	lbuf.clsdef.next = &lbuf.clsdef;
+	lbuf.clsdef.prev = &lbuf.clsdef;
+	lbuf.argdef.next = &lbuf.argdef;
+	lbuf.argdef.prev = &lbuf.argdef;
 	lbuf.objdef.next = &lbuf.objdef;
 	lbuf.objdef.prev = &lbuf.objdef;
 	lbuf.rootdef.next = &lbuf.rootdef;
 	lbuf.rootdef.prev = &lbuf.rootdef;
-	self->subchar = '$';
 	[self setRootClass: rootname];
 	loaded = 1;
 }
@@ -113,7 +113,7 @@ static struct {
 	struct ClassList *clsnew;
 
 	/* Check the registry first (for explicitly defined classes) */
-	for(clsnew = self->clsdef.next; clsnew != &self->clsdef; clsnew = clsnew->next)
+	for(clsnew = lbuf.clsdef.next; clsnew != &lbuf.clsdef; clsnew = clsnew->next)
 		if([self equalString: clsname to: clsnew->name] &&
 		   [self equalString: self->clsroot to: class_get_class_name(clsnew->root)])
 			return clsnew->cls;
@@ -148,7 +148,7 @@ static struct {
 {
 	struct ClassList *clsnew;
 
-	for(clsnew = self->clsdef.next; clsnew != &self->clsdef; clsnew = clsnew->next)
+	for(clsnew = lbuf.clsdef.next; clsnew != &lbuf.clsdef; clsnew = clsnew->next)
 		if([self equalString: clsname to: clsnew->name])
 			return clsnew;
 	return NULL;
@@ -167,12 +167,12 @@ static struct {
 
 - (struct ArgumentList *) getArgumentList
 {
-	return &self->argdef;
+	return &lbuf.argdef;
 }
 
 - (void) freeArgument: (struct ArgumentList *) argnew
 {
-	if(argnew == &self->argdef)
+	if(argnew == &lbuf.argdef)
 	{
 		argnew->next = argnew;
 		argnew->prev = argnew;
