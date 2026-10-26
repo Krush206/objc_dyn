@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "sh.h"
+#import "objc_dyn.h"
 
 @implementation Function
 - (struct Pack *) getBuiltin
