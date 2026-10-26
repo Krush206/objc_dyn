@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "sh.h"
+#import "objc_dyn.h"
 
 @implementation Shell (Execute)
 - (id) execute: (id) obj message: (const char *) message
