@@ -1,5 +1,5 @@
-#ifndef SH_H
-#define SH_H 1
+#ifndef OBJC_DYN_H
+#define OBJC_DYN_H 1
 #import <stdlib.h>
 #import <string.h>
 #import <unistd.h>
@@ -237,4 +237,4 @@ struct Pack {
 - (id) getShell;
 - (void) setShell: (id) ptr;
 @end
-#endif /* !SH_H */
+#endif /* !OBJC_DYN_H */
