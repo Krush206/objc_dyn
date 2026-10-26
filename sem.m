@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "sh.h"
+#import "objc_dyn.h"
 
 @implementation Shell (Semantic)
 - (void) execute: (struct Tree *) t input: (int *) pf1 output: (int *) pf2
